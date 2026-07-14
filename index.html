@@ -1,366 +1,246 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Qvicky Messenger</title>
+// ==========================================
+// ВСТАВЬ СВОИ ДАННЫЕ ОТ ZEGOCLOUD СЮДА:
+// ==========================================
+const ZEGOCLOUD_APP_ID = 1787230976; // ТВОЙ APP ID (Без кавычек)
+const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ТВОЙ SERVER SECRET
+
+// --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+let myName = "";
+let currentChatUser = "";
+let zegoInstance = null; 
+let incomingRoomID = ""; 
+let incomingCallerName = ""; 
+
+let mqttClient = null;
+
+let localDB = {
+    contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
+    messages: JSON.parse(localStorage.getItem('qvicky_messages')) || {}
+};
+
+function initApp() {
+    let input = document.getElementById('my-username').value.trim();
+    if (!input) return alert("Введите юзернейм!");
     
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
+    // ПРАВКА 1: Принудительно делаем юзернейм строчным (маленькие буквы)
+    myName = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
     
-    <style>
-        :root {
-            --primary: #512da8;
-            --primary-light: #673ab7;
-            --bg-color: #f0f2f5;
-            --chat-bg: #e5ddd5;
-            --text-dark: #333;
-            --text-light: #fff;
-        }
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('my-display-name').innerText = myName;
+    
+    renderContacts();
+    showScreen('contacts-screen');
+    
+    connectToMQTT();
+}
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: var(--bg-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+// ==========================================
+// БАЗА ДАННЫХ И СЕТЬ (MQTT)
+// ==========================================
+function connectToMQTT() {
+    const statusEl = document.getElementById('connection-status');
+    
+    // ПРАВКА 2: Меняем сервер на более стабильный HiveMQ
+    mqttClient = mqtt.connect('wss://broker.hivemq.com:8443/mqtt');
 
-        .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 600px; margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.1); position: relative; }
-        .screen.active { display: flex; }
-
-        header { background: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 1.2rem; font-weight: bold; z-index: 10; }
-        .back-btn { cursor: pointer; display: flex; align-items: center; font-size: 1rem; }
-        .call-btn { background: #4caf50; border: none; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
-
-        .search-bar { padding: 15px; background: #f9f9f9; border-bottom: 1px solid #ddd; display: flex; gap: 10px; }
-        .search-bar input { flex: 1; padding: 10px 15px; border-radius: 20px; border: 1px solid #ccc; outline: none; }
-        .search-bar button { background: var(--primary); color: white; border: none; padding: 0 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    mqttClient.on('connect', () => {
+        statusEl.innerText = "🟢 В сети (HiveMQ)";
+        statusEl.style.color = "#4caf50";
         
-        .contact-list { flex: 1; overflow-y: auto; }
-        .contact-item { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; cursor: pointer; transition: background 0.2s; }
-        .contact-item:hover { background: #f1f1f1; }
-        .avatar { width: 45px; height: 45px; background: var(--primary-light); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; margin-right: 15px; }
-        .contact-info { flex: 1; }
-        .contact-name { font-weight: bold; color: var(--text-dark); font-size: 1.1rem; }
+        // Подписываемся на свои каналы (без символа @ для надежности в пути)
+        const safeId = myName.replace('@', '');
+        mqttClient.subscribe(`qvicky/inbox/${safeId}`);
+        mqttClient.subscribe(`qvicky/call/${safeId}`);
+    });
 
-        .chat-area { flex: 1; background: var(--chat-bg); overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .msg { max-width: 80%; padding: 10px 15px; border-radius: 18px; font-size: 0.95rem; line-height: 1.4; position: relative; word-wrap: break-word; }
-        .msg.me { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .msg.other { background: white; color: var(--text-dark); align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .msg-time { font-size: 0.7rem; opacity: 0.7; margin-top: 5px; text-align: right; display: block; }
+    mqttClient.on('error', (err) => {
+        statusEl.innerText = "🔴 Ошибка подключения";
+        statusEl.style.color = "#f44336";
+        console.error("MQTT Error: ", err);
+    });
 
-        .input-area { padding: 10px 15px; background: white; display: flex; gap: 10px; align-items: center; border-top: 1px solid #ddd; }
-        .input-area input { flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid #ccc; outline: none; background: #f9f9f9; }
-        .input-area button { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
+    // Обработка входящих
+    mqttClient.on('message', (topic, message) => {
+        try {
+            const data = JSON.parse(message.toString());
+            const safeId = myName.replace('@', '');
 
-        .verified::after { content: " ✔"; color: #00bcd4; font-size: 1rem; }
-
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        .login-box { background: white; padding: 30px; border-radius: 20px; text-align: center; color: var(--text-dark); width: 90%; max-width: 400px; }
-        .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 10px; font-size: 1.1rem; text-align: center; }
-        .login-box button { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
-
-        #incoming-call-alert { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 3000; align-items: center; gap: 15px; }
-        #incoming-call-alert button { border: none; padding: 8px 15px; border-radius: 15px; font-weight: bold; cursor: pointer; }
-        
-        #zego-wrapper { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 1500; }
-        #zego-container { width: 100%; height: 100%; }
-        
-        /* Индикатор подключения к серверу */
-        #connection-status { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #666; z-index: 5000; }
-    </style>
-</head>
-<body>
-
-    <div id="login-overlay">
-        <h1 style="margin-bottom: 20px;">Qvicky 📱</h1>
-        <div class="login-box">
-            <h2>Ваш юзернейм</h2>
-            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">Придумайте логин для звонков</p>
-            <input type="text" id="my-username" placeholder="@alex">
-            <button onclick="initApp()">Войти</button>
-        </div>
-    </div>
-
-    <div id="connection-status">🟡 Подключение...</div>
-
-    <div id="incoming-call-alert">
-        <span id="caller-name">Входящий...</span>
-        <button style="background: #4caf50; color: white;" onclick="answerCall()">Ответить</button>
-        <button style="background: #f44336; color: white;" onclick="rejectCall()">Сбросить</button>
-    </div>
-
-    <div id="zego-wrapper">
-        <div id="zego-container"></div>
-    </div>
-
-    <div id="contacts-screen" class="screen">
-        <header>
-            <span>Контакты</span>
-            <span id="my-display-name" style="font-size: 0.9rem; opacity: 0.8;"></span>
-        </header>
-        <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Найти (напр. @Qvosis)">
-            <button onclick="addContact()">Добавить</button>
-        </div>
-        <div class="contact-list" id="contacts-container"></div>
-    </div>
-
-    <div id="chat-screen" class="screen">
-        <header>
-            <div class="back-btn" onclick="showScreen('contacts-screen')">◀ Назад</div>
-            <div id="chat-header-name" class="contact-name">@user</div>
-            <button class="call-btn" onclick="startCall()">📞 Видео</button>
-        </header>
-        <div class="chat-area" id="chat-messages"></div>
-        <div class="input-area">
-            <input type="text" id="msg-input" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') sendMessage()">
-            <button onclick="sendMessage()">➤</button>
-        </div>
-    </div>
-
-    <script>
-        // ==========================================
-        // ВСТАВЬ СВОИ ДАННЫЕ ОТ ZEGOCLOUD СЮДА:
-        // ==========================================
-        const ZEGOCLOUD_APP_ID = 1787230976; // ТВОЙ APP ID (Без кавычек)
-        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ТВОЙ SERVER SECRET
-
-        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-        let myName = "";
-        let currentChatUser = "";
-        let zegoInstance = null; 
-        let incomingRoomID = ""; 
-        let incomingCallerName = ""; 
-        
-        // Переменная для подключения к серверу связи MQTT
-        let mqttClient = null;
-
-        let localDB = {
-            contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
-            messages: JSON.parse(localStorage.getItem('qvicky_messages')) || {}
-        };
-
-        function initApp() {
-            let input = document.getElementById('my-username').value.trim();
-            if (!input) return alert("Введите юзернейм!");
-            
-            myName = input.startsWith('@') ? input : '@' + input;
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('my-display-name').innerText = myName;
-            
-            renderContacts();
-            showScreen('contacts-screen');
-            
-            // Запускаем подключение к новой базе данных (MQTT)
-            connectToMQTT();
-        }
-
-        // ==========================================
-        // НОВАЯ БАЗА ДАННЫХ И СЕТЬ (MQTT)
-        // ==========================================
-        function connectToMQTT() {
-            const statusEl = document.getElementById('connection-status');
-            
-            // Подключаемся к бесплатному публичному MQTT-брокеру через WebSockets
-            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
-
-            mqttClient.on('connect', () => {
-                statusEl.innerText = "🟢 В сети";
-                statusEl.style.color = "#4caf50";
+            if (topic === `qvicky/inbox/${safeId}`) {
+                saveMessageLocally(data.sender, data.sender, data.text);
+                if (currentChatUser === data.sender) renderChat(currentChatUser);
+            }
+            else if (topic === `qvicky/call/${safeId}`) {
+                const alertBox = document.getElementById('incoming-call-alert');
                 
-                // Подписываемся на свои личные "каналы"
-                mqttClient.subscribe(`qvicky/inbox/${myName}`); // Канал для сообщений
-                mqttClient.subscribe(`qvicky/call/${myName}`);  // Канал для сигналов звонка
-            });
-
-            mqttClient.on('error', (err) => {
-                statusEl.innerText = "🔴 Ошибка подключения";
-                statusEl.style.color = "#f44336";
-                console.error("MQTT Error: ", err);
-            });
-
-            // Обработка всех входящих сигналов и сообщений
-            mqttClient.on('message', (topic, message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-
-                    // Если пришло ТЕКСТОВОЕ СООБЩЕНИЕ
-                    if (topic === `qvicky/inbox/${myName}`) {
-                        saveMessageLocally(data.sender, data.sender, data.text);
-                        if (currentChatUser === data.sender) renderChat(currentChatUser);
-                    }
-                    
-                    // Если пришел СИГНАЛ ЗВОНКА
-                    else if (topic === `qvicky/call/${myName}`) {
-                        const alertBox = document.getElementById('incoming-call-alert');
-                        
-                        if (data.status === 'ringing') {
-                            incomingRoomID = data.roomID;
-                            incomingCallerName = data.initiator;
-                            document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
-                            alertBox.style.display = 'flex';
-                        } 
-                        else if (data.status === 'ended') {
-                            alertBox.style.display = 'none';
-                            if (zegoInstance) closeZegoUI();
-                        }
-                    }
-                } catch (e) {
-                    console.error("Ошибка обработки данных:", e);
+                if (data.status === 'ringing') {
+                    incomingRoomID = data.roomID;
+                    incomingCallerName = data.initiator;
+                    document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
+                    alertBox.style.display = 'flex';
+                } 
+                else if (data.status === 'ended') {
+                    alertBox.style.display = 'none';
+                    if (zegoInstance) closeZegoUI();
                 }
-            });
+            }
+        } catch (e) {
+            console.error("Ошибка парсинга:", e);
         }
+    });
+}
 
-        // ==========================================
-        // ZEGOCLOUD (ЛОГИКА ЗВОНКОВ)
-        // ==========================================
-        function startZegoCall(roomID) {
-            const wrapper = document.getElementById('zego-wrapper');
-            wrapper.style.display = 'block';
+// ==========================================
+// ZEGOCLOUD (ЛОГИКА ЗВОНКОВ)
+// ==========================================
+function startZegoCall(roomID) {
+    const wrapper = document.getElementById('zego-wrapper');
+    wrapper.style.display = 'block';
 
-            const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-                ZEGOCLOUD_APP_ID, 
-                ZEGOCLOUD_SERVER_SECRET, 
-                roomID, 
-                myName, 
-                myName 
-            );
+    const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+        ZEGOCLOUD_APP_ID, 
+        ZEGOCLOUD_SERVER_SECRET, 
+        roomID, 
+        myName, 
+        myName 
+    );
 
-            zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
-            zegoInstance.joinRoom({
-                container: document.getElementById('zego-container'),
-                scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
-                showPreJoinView: false,
-                
-                onLeaveRoom: () => {
-                    closeZegoUI();
-                    const targetUser = currentChatUser || incomingCallerName;
-                    if (targetUser && mqttClient) {
-                        // Отправляем сигнал отбоя по MQTT
-                        mqttClient.publish(`qvicky/call/${targetUser}`, JSON.stringify({ status: 'ended' }));
-                    }
-                }
-            });
-        }
-
-        function closeZegoUI() {
-            document.getElementById('zego-wrapper').style.display = 'none';
-            if (zegoInstance) {
-                zegoInstance.destroy();
-                zegoInstance = null;
+    zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
+    zegoInstance.joinRoom({
+        container: document.getElementById('zego-container'),
+        scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
+        showPreJoinView: false,
+        
+        onLeaveRoom: () => {
+            closeZegoUI();
+            const targetUser = currentChatUser || incomingCallerName;
+            if (targetUser && mqttClient) {
+                const targetSafeId = targetUser.replace('@', '');
+                mqttClient.publish(`qvicky/call/${targetSafeId}`, JSON.stringify({ status: 'ended' }));
             }
         }
+    });
+}
 
-        function startCall() {
-            if (!currentChatUser) return;
-            
-            const roomID = 'room_' + myName.replace('@', '');
-            startZegoCall(roomID);
+function closeZegoUI() {
+    document.getElementById('zego-wrapper').style.display = 'none';
+    if (zegoInstance) {
+        zegoInstance.destroy();
+        zegoInstance = null;
+    }
+}
 
-            // Шлем сигнал вызова другу по MQTT
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/call/${currentChatUser}`, JSON.stringify({
-                    initiator: myName,
-                    roomID: roomID,
-                    status: 'ringing'
-                }));
-            }
-        }
+function startCall() {
+    if (!currentChatUser) return;
+    
+    const roomID = 'room_' + myName.replace('@', '');
+    startZegoCall(roomID);
 
-        function answerCall() {
-            document.getElementById('incoming-call-alert').style.display = 'none';
-            currentChatUser = incomingCallerName; 
-            startZegoCall(incomingRoomID); 
-        }
+    if (mqttClient) {
+        const targetSafeId = currentChatUser.replace('@', '');
+        mqttClient.publish(`qvicky/call/${targetSafeId}`, JSON.stringify({
+            initiator: myName,
+            roomID: roomID,
+            status: 'ringing'
+        }));
+    }
+}
 
-        function rejectCall() {
-            document.getElementById('incoming-call-alert').style.display = 'none';
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/call/${incomingCallerName}`, JSON.stringify({ status: 'ended' }));
-            }
-        }
+function answerCall() {
+    document.getElementById('incoming-call-alert').style.display = 'none';
+    currentChatUser = incomingCallerName; 
+    startZegoCall(incomingRoomID); 
+}
 
-        // ==========================================
-        // ЛОГИКА ЧАТА И КОНТАКТОВ
-        // ==========================================
-        function saveMessageLocally(chatWith, sender, text) {
-            if (!localDB.messages[chatWith]) localDB.messages[chatWith] = [];
-            localDB.messages[chatWith].push({
-                sender: sender, text: text,
-                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            });
-            localStorage.setItem('qvicky_messages', JSON.stringify(localDB.messages));
-        }
+function rejectCall() {
+    document.getElementById('incoming-call-alert').style.display = 'none';
+    if (mqttClient) {
+        const targetSafeId = incomingCallerName.replace('@', '');
+        mqttClient.publish(`qvicky/call/${targetSafeId}`, JSON.stringify({ status: 'ended' }));
+    }
+}
 
-        function addContact() {
-            let input = document.getElementById('search-input').value.trim();
-            if (!input) return;
-            let targetUser = input.startsWith('@') ? input : '@' + input;
-            
-            if (targetUser === myName) return alert("Это ваш юзернейм!");
-            if (localDB.contacts.includes(targetUser)) return alert("Уже в контактах!");
+// ==========================================
+// ЛОГИКА ЧАТА И КОНТАКТОВ
+// ==========================================
+function saveMessageLocally(chatWith, sender, text) {
+    if (!localDB.messages[chatWith]) localDB.messages[chatWith] = [];
+    localDB.messages[chatWith].push({
+        sender: sender, text: text,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    });
+    localStorage.setItem('qvicky_messages', JSON.stringify(localDB.messages));
+}
 
-            localDB.contacts.push(targetUser);
-            localStorage.setItem('qvicky_contacts', JSON.stringify(localDB.contacts));
-            document.getElementById('search-input').value = '';
-            renderContacts();
-        }
+function addContact() {
+    let input = document.getElementById('search-input').value.trim();
+    if (!input) return;
+    
+    // ПРАВКА 3: Принудительно делаем юзернейм контакта строчным
+    let targetUser = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
+    
+    if (targetUser === myName) return alert("Это ваш юзернейм!");
+    if (localDB.contacts.includes(targetUser)) return alert("Уже в контактах!");
 
-        function renderContacts() {
-            const container = document.getElementById('contacts-container');
-            container.innerHTML = '';
-            localDB.contacts.forEach(user => {
-                const isVerified = user === "@Qvosis" ? ' verified' : '';
-                const initial = user.charAt(1).toUpperCase();
-                const div = document.createElement('div');
-                div.className = 'contact-item';
-                div.onclick = () => openChat(user);
-                div.innerHTML = `<div class="avatar">${initial}</div><div class="contact-info"><div class="contact-name${isVerified}">${user}</div></div>`;
-                container.appendChild(div);
-            });
-        }
+    localDB.contacts.push(targetUser);
+    localStorage.setItem('qvicky_contacts', JSON.stringify(localDB.contacts));
+    document.getElementById('search-input').value = '';
+    renderContacts();
+}
 
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
+function renderContacts() {
+    const container = document.getElementById('contacts-container');
+    container.innerHTML = '';
+    localDB.contacts.forEach(user => {
+        const isVerified = user === "@qvosis" ? ' verified' : ''; // Изменено на маленькие буквы для проверки
+        const initial = user.charAt(1).toUpperCase();
+        const div = document.createElement('div');
+        div.className = 'contact-item';
+        div.onclick = () => openChat(user);
+        div.innerHTML = `<div class="avatar">${initial}</div><div class="contact-info"><div class="contact-name${isVerified}">${user}</div></div>`;
+        container.appendChild(div);
+    });
+}
 
-        function openChat(user) {
-            currentChatUser = user;
-            const isVerified = user === "@Qvosis" ? ' verified' : '';
-            document.getElementById('chat-header-name').innerHTML = `<span class="${isVerified}">${user}</span>`;
-            renderChat(user);
-            showScreen('chat-screen');
-        }
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+}
 
-        function renderChat(user) {
-            const chatArea = document.getElementById('chat-messages');
-            chatArea.innerHTML = '';
-            const history = localDB.messages[user] || [];
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
-                div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
-                chatArea.appendChild(div);
-            });
-            chatArea.scrollTop = chatArea.scrollHeight;
-        }
+function openChat(user) {
+    currentChatUser = user;
+    const isVerified = user === "@qvosis" ? ' verified' : '';
+    document.getElementById('chat-header-name').innerHTML = `<span class="${isVerified}">${user}</span>`;
+    renderChat(user);
+    showScreen('chat-screen');
+}
 
-        function sendMessage() {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (!text || !currentChatUser) return;
+function renderChat(user) {
+    const chatArea = document.getElementById('chat-messages');
+    chatArea.innerHTML = '';
+    const history = localDB.messages[user] || [];
+    history.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
+        div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
+        chatArea.appendChild(div);
+    });
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
 
-            // Сохраняем и рендерим у себя
-            saveMessageLocally(currentChatUser, myName, text);
-            renderChat(currentChatUser);
-            input.value = '';
+function sendMessage() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text || !currentChatUser) return;
 
-            // Мгновенная отправка через MQTT
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/inbox/${currentChatUser}`, JSON.stringify({
-                    sender: myName,
-                    text: text
-                }));
-            }
-        }
-    </script>
-</body>
-</html>
+    saveMessageLocally(currentChatUser, myName, text);
+    renderChat(currentChatUser);
+    input.value = '';
+
+    if (mqttClient) {
+        const targetSafeId = currentChatUser.replace('@', '');
+        mqttClient.publish(`qvicky/inbox/${targetSafeId}`, JSON.stringify({
+            sender: myName,
+            text: text
+        }));
+    }
+}
