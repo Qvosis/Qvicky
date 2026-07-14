@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Qvicky Messenger</title>
     
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <!-- Возвращаем старую базу данных Gun.js -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <!-- ZegoCloud для звонков -->
     <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
     
     <style>
@@ -61,9 +63,6 @@
         
         #zego-wrapper { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 1500; }
         #zego-container { width: 100%; height: 100%; }
-        
-        /* Индикатор подключения к серверу */
-        #connection-status { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #666; z-index: 5000; }
     </style>
 </head>
 <body>
@@ -77,8 +76,6 @@
             <button onclick="initApp()">Войти</button>
         </div>
     </div>
-
-    <div id="connection-status">🟡 Подключение...</div>
 
     <div id="incoming-call-alert">
         <span id="caller-name">Входящий...</span>
@@ -119,8 +116,8 @@
         // ==========================================
         // ВСТАВЬ СВОИ ДАННЫЕ ОТ ZEGOCLOUD СЮДА:
         // ==========================================
-        const ZEGOCLOUD_APP_ID = 1787230976; // ТВОЙ APP ID (Без кавычек)
-        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ТВОЙ SERVER SECRET
+        const ZEGOCLOUD_APP_ID = 1787230976; // ВАЖНО: Должна быть цифра (без кавычек)
+        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ВАЖНО: Должна быть строка в кавычках
 
         // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
         let myName = "";
@@ -129,8 +126,12 @@
         let incomingRoomID = ""; 
         let incomingCallerName = ""; 
         
-        // Переменная для подключения к серверу связи MQTT
-        let mqttClient = null;
+        // Подключаем Gun.js сразу с несколькими серверами для надежности
+        const gun = Gun([
+            'https://gun-manhattan.herokuapp.com/gun',
+            'https://peer.wallie.io/gun',
+            'https://gun-vue.js.org/gun'
+        ]);
 
         let localDB = {
             contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
@@ -141,103 +142,104 @@
             let input = document.getElementById('my-username').value.trim();
             if (!input) return alert("Введите юзернейм!");
             
-            myName = input.startsWith('@') ? input : '@' + input;
+            // Чтобы не было путаницы, переводим все юзернеймы в нижний регистр
+            myName = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
+            
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('my-display-name').innerText = myName;
             
             renderContacts();
             showScreen('contacts-screen');
-            
-            // Запускаем подключение к новой базе данных (MQTT)
-            connectToMQTT();
+            listenForNetworkEvents();
         }
 
         // ==========================================
-        // НОВАЯ БАЗА ДАННЫХ И СЕТЬ (MQTT)
+        // БАЗА ДАННЫХ И СЕТЬ (Gun.js)
         // ==========================================
-        function connectToMQTT() {
-            const statusEl = document.getElementById('connection-status');
-            
-            // Подключаемся к бесплатному публичному MQTT-брокеру через WebSockets
-            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
+        function listenForNetworkEvents() {
+            let lastMsgId = {};
+            let lastCallTime = 0;
 
-            mqttClient.on('connect', () => {
-                statusEl.innerText = "🟢 В сети";
-                statusEl.style.color = "#4caf50";
+            const safeMyName = myName.replace('@', '');
+
+            // 1. Слушаем текстовые сообщения
+            gun.get('qvicky_inbox_' + safeMyName).on((data) => {
+                if (!data || !data.text || lastMsgId[data.sender] === data.id) return;
+                lastMsgId[data.sender] = data.id;
                 
-                // Подписываемся на свои личные "каналы"
-                mqttClient.subscribe(`qvicky/inbox/${myName}`); // Канал для сообщений
-                mqttClient.subscribe(`qvicky/call/${myName}`);  // Канал для сигналов звонка
+                saveMessageLocally(data.sender, data.sender, data.text);
+                if (currentChatUser === data.sender) renderChat(currentChatUser);
             });
 
-            mqttClient.on('error', (err) => {
-                statusEl.innerText = "🔴 Ошибка подключения";
-                statusEl.style.color = "#f44336";
-                console.error("MQTT Error: ", err);
-            });
+            // 2. Слушаем звонки
+            gun.get('qvicky_call_' + safeMyName).on((data) => {
+                if (!data || data.time === lastCallTime) return;
+                lastCallTime = data.time;
 
-            // Обработка всех входящих сигналов и сообщений
-            mqttClient.on('message', (topic, message) => {
-                try {
-                    const data = JSON.parse(message.toString());
-
-                    // Если пришло ТЕКСТОВОЕ СООБЩЕНИЕ
-                    if (topic === `qvicky/inbox/${myName}`) {
-                        saveMessageLocally(data.sender, data.sender, data.text);
-                        if (currentChatUser === data.sender) renderChat(currentChatUser);
-                    }
-                    
-                    // Если пришел СИГНАЛ ЗВОНКА
-                    else if (topic === `qvicky/call/${myName}`) {
-                        const alertBox = document.getElementById('incoming-call-alert');
-                        
-                        if (data.status === 'ringing') {
-                            incomingRoomID = data.roomID;
-                            incomingCallerName = data.initiator;
-                            document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
-                            alertBox.style.display = 'flex';
-                        } 
-                        else if (data.status === 'ended') {
-                            alertBox.style.display = 'none';
-                            if (zegoInstance) closeZegoUI();
-                        }
-                    }
-                } catch (e) {
-                    console.error("Ошибка обработки данных:", e);
+                const alertBox = document.getElementById('incoming-call-alert');
+                
+                if (data.status === 'ringing') {
+                    incomingRoomID = data.roomID;
+                    incomingCallerName = data.initiator;
+                    document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
+                    alertBox.style.display = 'flex';
+                } 
+                else if (data.status === 'ended') {
+                    alertBox.style.display = 'none';
+                    if (zegoInstance) closeZegoUI();
                 }
             });
         }
 
         // ==========================================
-        // ZEGOCLOUD (ЛОГИКА ЗВОНКОВ)
+        // ZEGOCLOUD (УМНАЯ ЛОГИКА ЗВОНКОВ)
         // ==========================================
         function startZegoCall(roomID) {
-            const wrapper = document.getElementById('zego-wrapper');
-            wrapper.style.display = 'block';
-
-            const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-                ZEGOCLOUD_APP_ID, 
-                ZEGOCLOUD_SERVER_SECRET, 
-                roomID, 
-                myName, 
-                myName 
-            );
-
-            zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
-            zegoInstance.joinRoom({
-                container: document.getElementById('zego-container'),
-                scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
-                showPreJoinView: false,
-                
-                onLeaveRoom: () => {
-                    closeZegoUI();
-                    const targetUser = currentChatUser || incomingCallerName;
-                    if (targetUser && mqttClient) {
-                        // Отправляем сигнал отбоя по MQTT
-                        mqttClient.publish(`qvicky/call/${targetUser}`, JSON.stringify({ status: 'ended' }));
-                    }
+            try {
+                // Проверка на частую ошибку с ключами
+                if (ZEGOCLOUD_APP_ID === 0 || ZEGOCLOUD_SERVER_SECRET === "ТВОЙ_СЕКРЕТ") {
+                    alert("ОШИБКА: Ты не вставил ключи ZegoCloud в код!");
+                    return false;
                 }
-            });
+                
+                // Проверка на протокол (камера не включится без HTTPS или Localhost)
+                if (window.location.protocol === 'file:') {
+                    alert("ОШИБКА: Камера не работает при открытии файла напрямую. Загрузи сайт на Glitch.com или используй локальный сервер (Live Server).");
+                    return false;
+                }
+
+                const wrapper = document.getElementById('zego-wrapper');
+                wrapper.style.display = 'block';
+
+                const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+                    ZEGOCLOUD_APP_ID, 
+                    ZEGOCLOUD_SERVER_SECRET, 
+                    roomID, 
+                    myName, 
+                    myName 
+                );
+
+                zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
+                zegoInstance.joinRoom({
+                    container: document.getElementById('zego-container'),
+                    scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
+                    showPreJoinView: false,
+                    
+                    onLeaveRoom: () => {
+                        closeZegoUI();
+                        const targetUser = currentChatUser || incomingCallerName;
+                        if (targetUser) {
+                            const targetSafeId = targetUser.replace('@', '');
+                            gun.get('qvicky_call_' + targetSafeId).put({ status: 'ended', time: Date.now() });
+                        }
+                    }
+                });
+                return true;
+            } catch (error) {
+                alert("Критическая ошибка при запуске камеры. Убедись, что AppID написан без кавычек. Текст ошибки: " + error.message);
+                closeZegoUI();
+                return false;
+            }
         }
 
         function closeZegoUI() {
@@ -248,33 +250,39 @@
             }
         }
 
+        // Я нажимаю кнопку "Позвонить"
         function startCall() {
             if (!currentChatUser) return;
             
             const roomID = 'room_' + myName.replace('@', '');
-            startZegoCall(roomID);
+            
+            // Пытаемся запустить звонок у себя
+            const isCallStarted = startZegoCall(roomID);
 
-            // Шлем сигнал вызова другу по MQTT
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/call/${currentChatUser}`, JSON.stringify({
+            // Если камера успешно включилась, шлем сигнал другу
+            if (isCallStarted) {
+                const targetSafeId = currentChatUser.replace('@', '');
+                gun.get('qvicky_call_' + targetSafeId).put({
                     initiator: myName,
                     roomID: roomID,
-                    status: 'ringing'
-                }));
+                    status: 'ringing',
+                    time: Date.now()
+                });
             }
         }
 
+        // Я отвечаю на вызов
         function answerCall() {
             document.getElementById('incoming-call-alert').style.display = 'none';
             currentChatUser = incomingCallerName; 
             startZegoCall(incomingRoomID); 
         }
 
+        // Я сбрасываю вызов
         function rejectCall() {
             document.getElementById('incoming-call-alert').style.display = 'none';
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/call/${incomingCallerName}`, JSON.stringify({ status: 'ended' }));
-            }
+            const targetSafeId = incomingCallerName.replace('@', '');
+            gun.get('qvicky_call_' + targetSafeId).put({ status: 'ended', time: Date.now() });
         }
 
         // ==========================================
@@ -292,7 +300,8 @@
         function addContact() {
             let input = document.getElementById('search-input').value.trim();
             if (!input) return;
-            let targetUser = input.startsWith('@') ? input : '@' + input;
+            
+            let targetUser = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
             
             if (targetUser === myName) return alert("Это ваш юзернейм!");
             if (localDB.contacts.includes(targetUser)) return alert("Уже в контактах!");
@@ -307,7 +316,7 @@
             const container = document.getElementById('contacts-container');
             container.innerHTML = '';
             localDB.contacts.forEach(user => {
-                const isVerified = user === "@Qvosis" ? ' verified' : '';
+                const isVerified = user === "@qvosis" ? ' verified' : '';
                 const initial = user.charAt(1).toUpperCase();
                 const div = document.createElement('div');
                 div.className = 'contact-item';
@@ -324,7 +333,7 @@
 
         function openChat(user) {
             currentChatUser = user;
-            const isVerified = user === "@Qvosis" ? ' verified' : '';
+            const isVerified = user === "@qvosis" ? ' verified' : '';
             document.getElementById('chat-header-name').innerHTML = `<span class="${isVerified}">${user}</span>`;
             renderChat(user);
             showScreen('chat-screen');
@@ -348,18 +357,16 @@
             const text = input.value.trim();
             if (!text || !currentChatUser) return;
 
-            // Сохраняем и рендерим у себя
             saveMessageLocally(currentChatUser, myName, text);
             renderChat(currentChatUser);
             input.value = '';
 
-            // Мгновенная отправка через MQTT
-            if (mqttClient) {
-                mqttClient.publish(`qvicky/inbox/${currentChatUser}`, JSON.stringify({
-                    sender: myName,
-                    text: text
-                }));
-            }
+            const targetSafeId = currentChatUser.replace('@', '');
+            gun.get('qvicky_inbox_' + targetSafeId).put({
+                sender: myName,
+                text: text,
+                id: Date.now()
+            });
         }
     </script>
 </body>
