@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Qvicky Messenger</title>
     
-    <!-- Подключаем децентрализованную БД Gun.js -->
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <!-- Подключаем ZegoCloud UIKit для звонков -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
     
     <style>
@@ -61,9 +59,11 @@
         #incoming-call-alert { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 3000; align-items: center; gap: 15px; }
         #incoming-call-alert button { border: none; padding: 8px 15px; border-radius: 15px; font-weight: bold; cursor: pointer; }
         
-        /* Контейнер ZegoCloud */
         #zego-wrapper { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 1500; }
         #zego-container { width: 100%; height: 100%; }
+        
+        /* Индикатор подключения к серверу */
+        #connection-status { position: fixed; bottom: 10px; left: 10px; font-size: 0.8rem; color: #666; z-index: 5000; }
     </style>
 </head>
 <body>
@@ -78,19 +78,18 @@
         </div>
     </div>
 
-    <!-- Окно входящего звонка -->
+    <div id="connection-status">🟡 Подключение...</div>
+
     <div id="incoming-call-alert">
         <span id="caller-name">Входящий...</span>
         <button style="background: #4caf50; color: white;" onclick="answerCall()">Ответить</button>
         <button style="background: #f44336; color: white;" onclick="rejectCall()">Сбросить</button>
     </div>
 
-    <!-- Окно ZegoCloud (Оно будет занимать весь экран во время звонка) -->
     <div id="zego-wrapper">
         <div id="zego-container"></div>
     </div>
 
-    <!-- ЭКРАН КОНТАКТОВ -->
     <div id="contacts-screen" class="screen">
         <header>
             <span>Контакты</span>
@@ -103,7 +102,6 @@
         <div class="contact-list" id="contacts-container"></div>
     </div>
 
-    <!-- ЭКРАН ЧАТА -->
     <div id="chat-screen" class="screen">
         <header>
             <div class="back-btn" onclick="showScreen('contacts-screen')">◀ Назад</div>
@@ -121,18 +119,18 @@
         // ==========================================
         // ВСТАВЬ СВОИ ДАННЫЕ ОТ ZEGOCLOUD СЮДА:
         // ==========================================
-        const ZEGOCLOUD_APP_ID = 1787230976; // Замени 0 на свой AppID (только цифры)
-        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // Вставь строку в кавычках
+        const ZEGOCLOUD_APP_ID = 1787230976; // ТВОЙ APP ID (Без кавычек)
+        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ТВОЙ SERVER SECRET
 
-        // Глобальные переменные
+        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
         let myName = "";
         let currentChatUser = "";
+        let zegoInstance = null; 
+        let incomingRoomID = ""; 
+        let incomingCallerName = ""; 
         
-        let zegoInstance = null; // Хранилище движка Zego
-        let incomingRoomID = ""; // Временное хранилище ID комнаты, если нам звонят
-        let incomingCallerName = ""; // Кто нам звонит
-        
-        const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+        // Переменная для подключения к серверу связи MQTT
+        let mqttClient = null;
 
         let localDB = {
             contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
@@ -149,74 +147,94 @@
             
             renderContacts();
             showScreen('contacts-screen');
-            listenForNetworkEvents();
+            
+            // Запускаем подключение к новой базе данных (MQTT)
+            connectToMQTT();
         }
 
-        // --- БАЗА ДАННЫХ И СЕТЬ (GUN.JS) ---
-        function listenForNetworkEvents() {
-            let lastMsgId = {};
-            let lastCallTime = 0;
+        // ==========================================
+        // НОВАЯ БАЗА ДАННЫХ И СЕТЬ (MQTT)
+        // ==========================================
+        function connectToMQTT() {
+            const statusEl = document.getElementById('connection-status');
+            
+            // Подключаемся к бесплатному публичному MQTT-брокеру через WebSockets
+            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
 
-            // 1. Слушаем текстовые сообщения
-            gun.get('qvicky_inbox_' + myName).on((data) => {
-                if (!data || !data.text || lastMsgId[data.sender] === data.id) return;
-                lastMsgId[data.sender] = data.id;
-                saveMessageLocally(data.sender, data.sender, data.text);
-                if (currentChatUser === data.sender) renderChat(currentChatUser);
+            mqttClient.on('connect', () => {
+                statusEl.innerText = "🟢 В сети";
+                statusEl.style.color = "#4caf50";
+                
+                // Подписываемся на свои личные "каналы"
+                mqttClient.subscribe(`qvicky/inbox/${myName}`); // Канал для сообщений
+                mqttClient.subscribe(`qvicky/call/${myName}`);  // Канал для сигналов звонка
             });
 
-            // 2. Слушаем звонки
-            gun.get('qvicky_call_' + myName).on((data) => {
-                if (!data || data.time === lastCallTime) return;
-                lastCallTime = data.time;
+            mqttClient.on('error', (err) => {
+                statusEl.innerText = "🔴 Ошибка подключения";
+                statusEl.style.color = "#f44336";
+                console.error("MQTT Error: ", err);
+            });
 
-                const alertBox = document.getElementById('incoming-call-alert');
-                
-                if (data.status === 'ringing') {
-                    incomingRoomID = data.roomID;
-                    incomingCallerName = data.initiator;
-                    document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
-                    alertBox.style.display = 'flex';
-                } 
-                else if (data.status === 'ended') {
-                    alertBox.style.display = 'none';
-                    if (zegoInstance) closeZegoUI(); // Сбрасываем звонок, если открыт интерфейс
+            // Обработка всех входящих сигналов и сообщений
+            mqttClient.on('message', (topic, message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+
+                    // Если пришло ТЕКСТОВОЕ СООБЩЕНИЕ
+                    if (topic === `qvicky/inbox/${myName}`) {
+                        saveMessageLocally(data.sender, data.sender, data.text);
+                        if (currentChatUser === data.sender) renderChat(currentChatUser);
+                    }
+                    
+                    // Если пришел СИГНАЛ ЗВОНКА
+                    else if (topic === `qvicky/call/${myName}`) {
+                        const alertBox = document.getElementById('incoming-call-alert');
+                        
+                        if (data.status === 'ringing') {
+                            incomingRoomID = data.roomID;
+                            incomingCallerName = data.initiator;
+                            document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
+                            alertBox.style.display = 'flex';
+                        } 
+                        else if (data.status === 'ended') {
+                            alertBox.style.display = 'none';
+                            if (zegoInstance) closeZegoUI();
+                        }
+                    }
+                } catch (e) {
+                    console.error("Ошибка обработки данных:", e);
                 }
             });
         }
 
-        // --- ZEGOCLOUD (ЛОГИКА ЗВОНКОВ) ---
-        
-        // Главная функция запуска звонка
+        // ==========================================
+        // ZEGOCLOUD (ЛОГИКА ЗВОНКОВ)
+        // ==========================================
         function startZegoCall(roomID) {
             const wrapper = document.getElementById('zego-wrapper');
-            wrapper.style.display = 'block'; // Показываем черный экран
+            wrapper.style.display = 'block';
 
-            // Генерируем токен для входа в комнату
             const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
                 ZEGOCLOUD_APP_ID, 
                 ZEGOCLOUD_SERVER_SECRET, 
                 roomID, 
-                myName, // Уникальный ID пользователя
-                myName  // Имя, которое увидят другие
+                myName, 
+                myName 
             );
 
-            // Создаем интерфейс
             zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
             zegoInstance.joinRoom({
                 container: document.getElementById('zego-container'),
-                scenario: {
-                    mode: ZegoUIKitPrebuilt.OneONoneCall, // Режим звонка 1 на 1
-                },
-                showPreJoinView: false, // Заходим сразу, без экрана "Настройте камеру"
+                scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
+                showPreJoinView: false,
                 
-                // Это событие срабатывает, когда мы сами нажимаем КРАСНУЮ трубку
                 onLeaveRoom: () => {
                     closeZegoUI();
-                    // Отправляем сигнал "отбой" собеседнику через Gun.js
                     const targetUser = currentChatUser || incomingCallerName;
-                    if (targetUser) {
-                        gun.get('qvicky_call_' + targetUser).put({ status: 'ended', time: Date.now() });
+                    if (targetUser && mqttClient) {
+                        // Отправляем сигнал отбоя по MQTT
+                        mqttClient.publish(`qvicky/call/${targetUser}`, JSON.stringify({ status: 'ended' }));
                     }
                 }
             });
@@ -225,45 +243,43 @@
         function closeZegoUI() {
             document.getElementById('zego-wrapper').style.display = 'none';
             if (zegoInstance) {
-                zegoInstance.destroy(); // Убиваем видео-процесс Zego
+                zegoInstance.destroy();
                 zegoInstance = null;
             }
         }
 
-        // Я нажимаю кнопку "Позвонить" в чате
         function startCall() {
             if (!currentChatUser) return;
             
-            // Генерируем уникальное имя комнаты (на основе моего имени)
             const roomID = 'room_' + myName.replace('@', '');
-            
-            startZegoCall(roomID); // Запускаем у себя
+            startZegoCall(roomID);
 
-            // Отправляем сигнал другу через базу
-            gun.get('qvicky_call_' + currentChatUser).put({
-                initiator: myName,
-                roomID: roomID,
-                status: 'ringing',
-                time: Date.now()
-            });
+            // Шлем сигнал вызова другу по MQTT
+            if (mqttClient) {
+                mqttClient.publish(`qvicky/call/${currentChatUser}`, JSON.stringify({
+                    initiator: myName,
+                    roomID: roomID,
+                    status: 'ringing'
+                }));
+            }
         }
 
-        // Я нажимаю "Ответить" на всплывающем окне
         function answerCall() {
             document.getElementById('incoming-call-alert').style.display = 'none';
-            currentChatUser = incomingCallerName; // Переключаем активный чат на звонящего
-            startZegoCall(incomingRoomID); // Подключаемся к его комнате
+            currentChatUser = incomingCallerName; 
+            startZegoCall(incomingRoomID); 
         }
 
-        // Я нажимаю "Сбросить" на всплывающем окне
         function rejectCall() {
             document.getElementById('incoming-call-alert').style.display = 'none';
-            // Отправляем сигнал "отбой" звонящему
-            gun.get('qvicky_call_' + incomingCallerName).put({ status: 'ended', time: Date.now() });
+            if (mqttClient) {
+                mqttClient.publish(`qvicky/call/${incomingCallerName}`, JSON.stringify({ status: 'ended' }));
+            }
         }
 
-
-        // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (Контакты и Чат) ---
+        // ==========================================
+        // ЛОГИКА ЧАТА И КОНТАКТОВ
+        // ==========================================
         function saveMessageLocally(chatWith, sender, text) {
             if (!localDB.messages[chatWith]) localDB.messages[chatWith] = [];
             localDB.messages[chatWith].push({
@@ -332,13 +348,18 @@
             const text = input.value.trim();
             if (!text || !currentChatUser) return;
 
+            // Сохраняем и рендерим у себя
             saveMessageLocally(currentChatUser, myName, text);
             renderChat(currentChatUser);
             input.value = '';
 
-            gun.get('qvicky_inbox_' + currentChatUser).put({
-                sender: myName, text: text, id: Date.now()
-            });
+            // Мгновенная отправка через MQTT
+            if (mqttClient) {
+                mqttClient.publish(`qvicky/inbox/${currentChatUser}`, JSON.stringify({
+                    sender: myName,
+                    text: text
+                }));
+            }
         }
     </script>
 </body>
