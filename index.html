@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Qvicky Messenger</title>
     
-    <!-- Подключаем PeerJS для P2P сети (прямое соединение по юзернейму) -->
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!-- Подключаем базу данных Gun.js -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <!-- Подключаем Daily.co для видеозвонков -->
+    <script src="https://unpkg.com/@daily-co/daily-js"></script>
     
     <style>
         :root {
@@ -19,15 +21,14 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        
         body { background-color: var(--bg-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* Экраны */
-        .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 600px; margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 600px; margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.1); position: relative; }
         .screen.active { display: flex; }
 
         /* Шапка */
-        header { background: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 1.2rem; font-weight: bold; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        header { background: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 1.2rem; font-weight: bold; z-index: 10; }
         .back-btn { cursor: pointer; display: flex; align-items: center; font-size: 1rem; }
         .call-btn { background: #4caf50; border: none; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
 
@@ -57,19 +58,19 @@
         /* Галочка */
         .verified::after { content: " ✔"; color: #00bcd4; font-size: 1rem; }
 
-        /* Звонки (Модальное окно) */
-        #call-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        video { width: 100%; max-width: 400px; border-radius: 15px; background: #222; margin-bottom: 20px; object-fit: cover; }
-        #local-video { width: 100px; position: absolute; bottom: 30px; right: 20px; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .call-actions { display: flex; gap: 20px; position: absolute; bottom: 40px; }
-        .btn-call-end { background: #f44336; border: none; color: white; padding: 15px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
-        .btn-call-answer { background: #4caf50; border: none; color: white; padding: 15px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
-
         /* Экран входа */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
         .login-box { background: white; padding: 30px; border-radius: 20px; text-align: center; color: var(--text-dark); width: 90%; max-width: 400px; }
         .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 10px; font-size: 1.1rem; text-align: center; }
         .login-box button { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
+
+        /* Уведомление о звонке и контейнер Daily.co */
+        #incoming-call-alert { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 3000; align-items: center; gap: 15px; }
+        #incoming-call-alert button { border: none; padding: 8px 15px; border-radius: 15px; font-weight: bold; cursor: pointer; }
+        
+        #daily-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1500; flex-direction: column; }
+        #daily-iframe-wrapper { flex: 1; width: 100%; }
+        .daily-close-btn { background: #f44336; color: white; text-align: center; padding: 15px; font-weight: bold; cursor: pointer; font-size: 1.1rem; border: none; width: 100%; }
     </style>
 </head>
 <body>
@@ -85,6 +86,19 @@
         </div>
     </div>
 
+    <!-- ВХОДЯЩИЙ ЗВОНОК -->
+    <div id="incoming-call-alert">
+        <span id="caller-name">Кто-то звонит...</span>
+        <button style="background: #4caf50; color: white;" onclick="answerCall()">Ответить</button>
+        <button style="background: #f44336; color: white;" onclick="rejectCall()">Сбросить</button>
+    </div>
+
+    <!-- КОНТЕЙНЕР ДЛЯ ЗВОНКА (DAILY.CO) -->
+    <div id="daily-container">
+        <div id="daily-iframe-wrapper"></div>
+        <button class="daily-close-btn" onclick="endCall()">Завершить звонок</button>
+    </div>
+
     <!-- ЭКРАН КОНТАКТОВ -->
     <div id="contacts-screen" class="screen">
         <header>
@@ -93,13 +107,11 @@
         </header>
         
         <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Поиск по юзернейму (напр. @Qvosis)">
+            <input type="text" id="search-input" placeholder="Поиск (напр. @Qvosis)">
             <button onclick="addContact()">Добавить</button>
         </div>
 
-        <div class="contact-list" id="contacts-container">
-            <!-- Список контактов генерируется JS -->
-        </div>
+        <div class="contact-list" id="contacts-container"></div>
     </div>
 
     <!-- ЭКРАН ЧАТА -->
@@ -107,12 +119,10 @@
         <header>
             <div class="back-btn" onclick="showScreen('contacts-screen')">◀ Назад</div>
             <div id="chat-header-name" class="contact-name">@user</div>
-            <button class="call-btn" onclick="startCall()">📞</button>
+            <button class="call-btn" onclick="startCall()">📞 Звонок</button>
         </header>
         
-        <div class="chat-area" id="chat-messages">
-            <!-- Сообщения -->
-        </div>
+        <div class="chat-area" id="chat-messages"></div>
 
         <div class="input-area">
             <input type="text" id="msg-input" placeholder="Написать сообщение..." onkeypress="if(event.key === 'Enter') sendMessage()">
@@ -120,94 +130,92 @@
         </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО ЗВОНКА -->
-    <div id="call-modal">
-        <h2 id="call-status" style="position: absolute; top: 40px;">Звонок...</h2>
-        <video id="remote-video" autoplay playsinline></video>
-        <video id="local-video" autoplay playsinline muted></video>
-        
-        <div class="call-actions" id="incoming-actions" style="display: none;">
-            <button class="btn-call-end" onclick="rejectCall()">Отклонить</button>
-            <button class="btn-call-answer" onclick="answerCall()">Ответить</button>
-        </div>
-        
-        <div class="call-actions" id="active-actions">
-            <button class="btn-call-end" onclick="endCall()">Завершить звонок</button>
-        </div>
-    </div>
-
     <script>
-        // --- 1. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+        // === НАСТРОЙКИ DAILY.CO ===
+        // ВАЖНО: Вставь сюда ссылку на свою комнату из панели Daily.co
+        const DAILY_ROOM_URL = 'https://qvicky.daily.co/0ICnFTTodV4OMILLnCNm';
+
+        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
         let myName = "";
         let currentChatUser = "";
-        let peer = null;
-        let currentCall = null;
-        let localStream = null;
+        let callFrame = null;
+        
+        // Подключение к публичной децентрализованной сети Gun.js (для передачи сообщений)
+        const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
 
-        // База данных в LocalStorage
-        let db = {
+        // Локальная база для сохранения истории на телефоне
+        let localDB = {
             contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
             messages: JSON.parse(localStorage.getItem('qvicky_messages')) || {}
         };
 
-        // --- 2. ИНИЦИАЛИЗАЦИЯ И СЕТЬ (PeerJS) ---
+        // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
         function initApp() {
             let input = document.getElementById('my-username').value.trim();
             if (!input) return alert("Введите юзернейм!");
             
-            // Форматируем юзернейм
             myName = input.startsWith('@') ? input : '@' + input;
-            
-            // Скрываем экран входа
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('my-display-name').innerText = myName;
             
-            // Создаем уникальный ID для сети (убираем @ для системного ID)
-            const peerId = 'qvicky-' + myName.substring(1).toLowerCase();
-            
-            peer = new Peer(peerId);
+            renderContacts();
+            showScreen('contacts-screen');
+            listenForNetworkEvents();
+        }
 
-            peer.on('open', (id) => {
-                console.log('Подключено к сети как: ' + id);
-                renderContacts();
-                showScreen('contacts-screen');
-            });
+        // --- ЛОГИКА БАЗЫ ДАННЫХ (GUN.JS + LOCALSTORAGE) ---
+        function listenForNetworkEvents() {
+            let lastMsgId = {};
+            let lastCallTime = 0;
 
-            // Обработка ВХОДЯЩИХ сообщений
-            peer.on('connection', (conn) => {
-                conn.on('data', (data) => {
-                    saveMessage(data.sender, data.sender, data.text);
-                    if (currentChatUser === data.sender) renderChat(currentChatUser);
-                });
-            });
-
-            // Обработка ВХОДЯЩЕГО звонка
-            peer.on('call', (call) => {
-                currentCall = call;
-                document.getElementById('call-modal').style.display = 'flex';
-                document.getElementById('call-status').innerText = `Входящий от @${call.peer.split('-')[1]}`;
-                document.getElementById('incoming-actions').style.display = 'flex';
-                document.getElementById('active-actions').style.display = 'none';
+            // 1. Слушаем входящие сообщения
+            gun.get('qvicky_inbox_' + myName).on((data) => {
+                if (!data || !data.text || lastMsgId[data.sender] === data.id) return;
+                lastMsgId[data.sender] = data.id; // Защита от дублей
                 
-                // Получаем свою камеру заранее
-                navigator.mediaDevices.getUserMedia({video: true, audio: true}).then(stream => {
-                    localStream = stream;
-                    document.getElementById('local-video').srcObject = stream;
-                });
+                saveMessageLocally(data.sender, data.sender, data.text);
+                if (currentChatUser === data.sender) renderChat(currentChatUser);
+            });
+
+            // 2. Слушаем входящие звонки
+            gun.get('qvicky_call_' + myName).on((data) => {
+                if (!data || data.time === lastCallTime) return;
+                lastCallTime = data.time;
+
+                const alertBox = document.getElementById('incoming-call-alert');
+                if (data.status === 'ringing') {
+                    document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
+                    alertBox.style.display = 'flex';
+                } else if (data.status === 'ended') {
+                    alertBox.style.display = 'none';
+                    if (callFrame && !document.getElementById('daily-container').style.display) {
+                        endCall(); // Сбрасываем, если не успели ответить
+                    }
+                }
             });
         }
 
-        // --- 3. ЛОГИКА КОНТАКТОВ (База данных) ---
+        function saveMessageLocally(chatWith, sender, text) {
+            if (!localDB.messages[chatWith]) localDB.messages[chatWith] = [];
+            localDB.messages[chatWith].push({
+                sender: sender,
+                text: text,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            });
+            localStorage.setItem('qvicky_messages', JSON.stringify(localDB.messages));
+        }
+
+        // --- ЛОГИКА КОНТАКТОВ ---
         function addContact() {
             let input = document.getElementById('search-input').value.trim();
             if (!input) return;
             let targetUser = input.startsWith('@') ? input : '@' + input;
             
-            if (targetUser === myName) return alert("Нельзя добавить самого себя!");
-            if (db.contacts.includes(targetUser)) return alert("Контакт уже в списке!");
+            if (targetUser === myName) return alert("Это ваш юзернейм!");
+            if (localDB.contacts.includes(targetUser)) return alert("Уже в контактах!");
 
-            db.contacts.push(targetUser);
-            localStorage.setItem('qvicky_contacts', JSON.stringify(db.contacts));
+            localDB.contacts.push(targetUser);
+            localStorage.setItem('qvicky_contacts', JSON.stringify(localDB.contacts));
             
             document.getElementById('search-input').value = '';
             renderContacts();
@@ -217,24 +225,19 @@
             const container = document.getElementById('contacts-container');
             container.innerHTML = '';
             
-            db.contacts.forEach(user => {
+            localDB.contacts.forEach(user => {
                 const isVerified = user === "@Qvosis" ? ' verified' : '';
                 const initial = user.charAt(1).toUpperCase();
                 
                 const div = document.createElement('div');
                 div.className = 'contact-item';
                 div.onclick = () => openChat(user);
-                div.innerHTML = `
-                    <div class="avatar">${initial}</div>
-                    <div class="contact-info">
-                        <div class="contact-name${isVerified}">${user}</div>
-                    </div>
-                `;
+                div.innerHTML = `<div class="avatar">${initial}</div><div class="contact-info"><div class="contact-name${isVerified}">${user}</div></div>`;
                 container.appendChild(div);
             });
         }
 
-        // --- 4. ЛОГИКА ЧАТА ---
+        // --- ЛОГИКА ЧАТА ---
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
@@ -248,28 +251,17 @@
             showScreen('chat-screen');
         }
 
-        function saveMessage(chatWith, sender, text) {
-            if (!db.messages[chatWith]) db.messages[chatWith] = [];
-            db.messages[chatWith].push({
-                sender: sender,
-                text: text,
-                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            });
-            localStorage.setItem('qvicky_messages', JSON.stringify(db.messages));
-        }
-
         function renderChat(user) {
             const chatArea = document.getElementById('chat-messages');
             chatArea.innerHTML = '';
+            const history = localDB.messages[user] || [];
             
-            const history = db.messages[user] || [];
             history.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
                 div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
                 chatArea.appendChild(div);
             });
-            
             chatArea.scrollTop = chatArea.scrollHeight;
         }
 
@@ -279,77 +271,80 @@
             if (!text || !currentChatUser) return;
 
             // Сохраняем и показываем у себя
-            saveMessage(currentChatUser, myName, text);
+            saveMessageLocally(currentChatUser, myName, text);
             renderChat(currentChatUser);
             input.value = '';
 
-            // Отправляем по сети (P2P)
-            const targetPeerId = 'qvicky-' + currentChatUser.substring(1).toLowerCase();
-            const conn = peer.connect(targetPeerId);
-            conn.on('open', () => {
-                conn.send({ sender: myName, text: text });
+            // Отправляем собеседнику через Gun.js
+            gun.get('qvicky_inbox_' + currentChatUser).put({
+                sender: myName,
+                text: text,
+                id: Date.now()
             });
         }
 
-        // --- 5. ЗВОНКИ ЧЕРЕЗ WEBRTC (PEERJS) ---
+        // --- ЛОГИКА ЗВОНКОВ (DAILY.CO) ---
+        function initDailyFrame() {
+            if (callFrame) return;
+            const wrapper = document.getElementById('daily-iframe-wrapper');
+            callFrame = window.DailyIframe.createFrame(wrapper, {
+                iframeStyle: { width: '100%', height: '100%', border: 'none' }
+            });
+        }
+
         function startCall() {
             if (!currentChatUser) return;
             
-            document.getElementById('call-modal').style.display = 'flex';
-            document.getElementById('call-status').innerText = 'Звоним...';
-            document.getElementById('incoming-actions').style.display = 'none';
-            document.getElementById('active-actions').style.display = 'flex';
+            // 1. Открываем интерфейс
+            document.getElementById('daily-container').style.display = 'flex';
+            
+            // 2. Создаем и запускаем звонок Daily
+            initDailyFrame();
+            callFrame.join({ url: DAILY_ROOM_URL });
 
-            navigator.mediaDevices.getUserMedia({video: true, audio: true}).then(stream => {
-                localStream = stream;
-                document.getElementById('local-video').srcObject = stream;
-                
-                const targetPeerId = 'qvicky-' + currentChatUser.substring(1).toLowerCase();
-                currentCall = peer.call(targetPeerId, stream);
-                
-                currentCall.on('stream', remoteStream => {
-                    document.getElementById('call-status').innerText = '';
-                    document.getElementById('remote-video').srcObject = remoteStream;
-                });
-
-                currentCall.on('close', closeCallUI);
-            }).catch(err => {
-                alert("Ошибка доступа к камере/микрофону: " + err);
-                closeCallUI();
+            // 3. Отправляем сигнал "Звоню" через Gun.js
+            gun.get('qvicky_call_' + currentChatUser).put({
+                initiator: myName,
+                status: 'ringing',
+                time: Date.now()
             });
         }
 
         function answerCall() {
-            document.getElementById('incoming-actions').style.display = 'none';
-            document.getElementById('active-actions').style.display = 'flex';
-            document.getElementById('call-status').innerText = '';
-
-            currentCall.answer(localStream);
-            currentCall.on('stream', remoteStream => {
-                document.getElementById('remote-video').srcObject = remoteStream;
-            });
-            currentCall.on('close', closeCallUI);
+            document.getElementById('incoming-call-alert').style.display = 'none';
+            document.getElementById('daily-container').style.display = 'flex';
+            
+            initDailyFrame();
+            callFrame.join({ url: DAILY_ROOM_URL });
         }
 
         function rejectCall() {
-            if (currentCall) currentCall.close();
-            closeCallUI();
+            document.getElementById('incoming-call-alert').style.display = 'none';
+            // Получаем имя того, кто звонил, из интерфейса (грязный хак для скорости)
+            const callerText = document.getElementById('caller-name').innerText;
+            const callerName = callerText.replace('Звонок от ', '');
+            
+            // Отправляем ему сигнал отбоя
+            gun.get('qvicky_call_' + callerName).put({
+                status: 'ended',
+                time: Date.now()
+            });
         }
 
         function endCall() {
-            if (currentCall) currentCall.close();
-            closeCallUI();
-        }
-
-        function closeCallUI() {
-            document.getElementById('call-modal').style.display = 'none';
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
+            if (callFrame) {
+                callFrame.destroy();
+                callFrame = null;
             }
-            document.getElementById('local-video').srcObject = null;
-            document.getElementById('remote-video').srcObject = null;
-            currentCall = null;
+            document.getElementById('daily-container').style.display = 'none';
+            
+            // Если мы кому-то звонили, говорим базе данных, что звонок окончен
+            if (currentChatUser) {
+                gun.get('qvicky_call_' + currentChatUser).put({
+                    status: 'ended',
+                    time: Date.now()
+                });
+            }
         }
     </script>
 </body>
