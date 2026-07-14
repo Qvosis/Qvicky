@@ -28,41 +28,14 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; -webkit-tap-highlight-color: transparent; }
         
-        body { 
-            background-color: var(--bg-dark); 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-            color: var(--text-main);
-            position: relative;
-        }
+        body { background-color: var(--bg-dark); height: 100vh; display: flex; flex-direction: column; overflow: hidden; color: var(--text-main); position: relative; }
 
         /* === АНИМИРОВАННЫЙ ЖИДКИЙ ФОН === */
         .liquid-bg { position: absolute; inset: 0; overflow: hidden; z-index: -1; }
-        .blob {
-            position: absolute;
-            filter: blur(60px);
-            opacity: 0.6;
-            animation: moveLiquid 12s infinite alternate ease-in-out;
-        }
-        .blob-1 {
-            width: 350px; height: 350px; background: var(--primary);
-            top: -100px; left: -100px;
-            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-        }
-        .blob-2 {
-            width: 450px; height: 450px; background: #8b5cf6;
-            bottom: -150px; right: -100px;
-            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-            animation-delay: -4s;
-        }
-        .blob-3 {
-            width: 300px; height: 300px; background: #3b82f6;
-            top: 40%; left: 30%;
-            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
-            animation-delay: -8s;
-        }
+        .blob { position: absolute; filter: blur(60px); opacity: 0.6; animation: moveLiquid 12s infinite alternate ease-in-out; }
+        .blob-1 { width: 350px; height: 350px; background: var(--primary); top: -100px; left: -100px; border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+        .blob-2 { width: 450px; height: 450px; background: #8b5cf6; bottom: -150px; right: -100px; border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; animation-delay: -4s; }
+        .blob-3 { width: 300px; height: 300px; background: #3b82f6; top: 40%; left: 30%; border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; animation-delay: -8s; }
 
         @keyframes moveLiquid {
             0% { transform: translateY(0) scale(1) rotate(0deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
@@ -70,44 +43,31 @@
             100% { transform: translateY(-50px) scale(1.1) rotate(20deg); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
         }
 
-        /* === УНИВЕРСАЛЬНЫЙ КЛАСС ЖИДКОГО СТЕКЛА === */
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-        }
+        .glass-panel { background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
 
         /* === ЭКРАНЫ === */
         .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 500px; margin: 0 auto; position: relative; z-index: 10; }
         .screen.active { display: flex; animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* === АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ === */
-        .auth-container { margin: auto; padding: 40px 30px; border-radius: 30px; text-align: center; width: 90%; max-width: 400px; }
-        .auth-container input {
-            width: 100%; padding: 15px 20px; margin: 10px 0; border-radius: 15px; outline: none;
-            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white; font-size: 1.1rem; transition: 0.3s;
-        }
-        .auth-container input::placeholder { color: rgba(255, 255, 255, 0.5); }
-        .auth-container input:focus { background: rgba(255, 255, 255, 0.15); border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
-        .auth-btn {
-            width: 100%; background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: #000; border: none; padding: 15px; margin-top: 15px; border-radius: 15px;
-            font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s;
-        }
-        .auth-btn:active { transform: scale(0.95); }
+        /* === ЭКРАН ЗАГРУЗКИ === */
+        #splash-screen { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s ease; background: var(--bg-dark); }
+        .logo-svg { width: 120px; height: 120px; animation: pulse 2s infinite ease-in-out; }
+        @keyframes pulse { 0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--primary)); } 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } }
+
+        /* === АВТОРИЗАЦИЯ И НАСТРОЙКИ === */
+        .form-container { margin: auto; padding: 40px 30px; border-radius: 30px; text-align: center; width: 90%; max-width: 400px; }
+        .form-container input { width: 100%; padding: 15px 20px; margin: 10px 0; border-radius: 15px; outline: none; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: white; font-size: 1.1rem; transition: 0.3s; }
+        .form-container input:focus { background: rgba(255, 255, 255, 0.15); border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
+        .action-btn { width: 100%; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border: none; padding: 15px; margin-top: 15px; border-radius: 15px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .action-btn:active { transform: scale(0.95); }
         .auth-switch { color: var(--text-muted); font-size: 0.9rem; margin-top: 20px; cursor: pointer; text-decoration: underline; transition: 0.2s; }
         .auth-switch:hover { color: var(--primary); }
-
-        /* Скрываем формы по умолчанию */
         #register-form { display: none; }
 
         /* === ШАПКА === */
         header { padding: 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--glass-border); border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; margin-bottom: 10px; }
-        .back-btn { cursor: pointer; color: var(--primary); font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .icon-btn { cursor: pointer; color: var(--primary); font-weight: bold; display: flex; align-items: center; gap: 5px; background: none; border: none; font-size: 1.1rem; }
         .call-btn { background: rgba(0, 176, 155, 0.2); color: #00f2fe; border: 1px solid #00b09b; padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .call-btn:hover { background: #00b09b; color: white; box-shadow: 0 0 15px rgba(0, 176, 155, 0.5); }
 
@@ -118,7 +78,8 @@
         .contact-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
         .contact-item { padding: 15px; margin-bottom: 12px; border-radius: 20px; display: flex; align-items: center; cursor: pointer; transition: 0.3s; }
         .contact-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(0, 242, 254, 0.4); }
-        .avatar { width: 45px; height: 45px; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; margin-right: 15px; box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); }
+        .avatar { width: 45px; height: 45px; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; margin-right: 15px; box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); overflow: hidden; }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
         /* === ЧАТ === */
         .chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
@@ -126,23 +87,15 @@
         .msg.me { background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border: 1px solid rgba(0, 242, 254, 0.3); color: white; align-self: flex-end; border-bottom-right-radius: 5px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
         .msg.other { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; align-self: flex-start; border-bottom-left-radius: 5px; }
         .msg-time { font-size: 0.7rem; opacity: 0.6; display: block; text-align: right; margin-top: 5px; }
-
         .input-area { padding: 15px 20px; display: flex; gap: 10px; border-top: 1px solid var(--glass-border); border-top-left-radius: 20px; border-top-right-radius: 20px; }
         .input-area input { flex: 1; padding: 15px 20px; border-radius: 25px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); color: white; outline: none; }
-        .input-area button { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border: none; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
+        .input-area button { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border: none; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; }
 
-        /* === ГАЛОЧКА И СПЛЕШ === */
+        /* === ГАЛОЧКА И ЗВОНКИ === */
         .verified::after { content: " ✔"; color: var(--primary); font-size: 1rem; text-shadow: 0 0 8px var(--primary); }
-        
-        #splash-screen { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s ease; background: var(--bg-dark); }
-        .logo-svg { width: 120px; height: 120px; animation: pulse 2s infinite ease-in-out; }
-        @keyframes pulse { 0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--primary)); } 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } }
-
-        /* === ОКНО ЗВОНКА === */
         #incoming-call-alert { display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; padding: 20px 30px; border-radius: 25px; align-items: center; gap: 20px; }
         .btn-answer { background: #00b09b; border: none; padding: 10px 20px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; }
         .btn-reject { background: #ff4b2b; border: none; padding: 10px 20px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; }
-
         #daily-container { display: none; position: fixed; inset: 0; background: black; z-index: 2000; flex-direction: column; }
         #daily-iframe-wrapper { flex: 1; width: 100%; }
         .daily-close-btn { background: #ff4b2b; color: white; padding: 20px; text-align: center; font-weight: bold; cursor: pointer; font-size: 1.2rem; }
@@ -150,7 +103,6 @@
 </head>
 <body>
 
-    <!-- Жидкий анимированный фон -->
     <div class="liquid-bg">
         <div class="blob blob-1"></div>
         <div class="blob blob-2"></div>
@@ -162,8 +114,7 @@
         <svg class="logo-svg" viewBox="0 0 100 100">
             <defs>
                 <linearGradient id="qGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#00f2fe" />
-                    <stop offset="100%" stop-color="#4facfe" />
+                    <stop offset="0%" stop-color="#00f2fe" /><stop offset="100%" stop-color="#4facfe" />
                 </linearGradient>
             </defs>
             <circle cx="50" cy="50" r="40" fill="none" stroke="url(#qGrad)" stroke-width="8" />
@@ -173,35 +124,57 @@
         <div style="margin-top: 20px; font-size: 2rem; font-weight: bold; letter-spacing: 2px; color: white;">QVICKY</div>
     </div>
 
-    <!-- ЭКРАН АВТОРИЗАЦИИ / РЕГИСТРАЦИИ -->
+    <!-- ЭКРАН АВТОРИЗАЦИИ -->
     <div id="auth-screen" class="screen">
-        
-        <!-- Форма Входа -->
-        <div class="auth-container glass-panel" id="login-form">
+        <div class="form-container glass-panel" id="login-form">
             <h2>С возвращением!</h2>
             <p style="color: var(--text-muted); margin: 10px 0 20px;">Введите данные для входа</p>
             <input type="text" id="log-username" placeholder="Юзернейм (напр. @alex)">
             <input type="password" id="log-pass" placeholder="Пароль">
-            <button class="auth-btn" onclick="loginUser()">Войти</button>
+            <button class="action-btn" onclick="loginUser()">Войти</button>
             <div class="auth-switch" onclick="toggleAuth('register')">Нет аккаунта? Зарегистрироваться</div>
         </div>
 
-        <!-- Форма Регистрации -->
-        <div class="auth-container glass-panel" id="register-form">
+        <div class="form-container glass-panel" id="register-form">
             <h2>Создать аккаунт</h2>
-            <p style="color: var(--text-muted); margin: 10px 0 20px;">Придумайте свой уникальный юзернейм</p>
             <input type="text" id="reg-username" placeholder="Юзернейм (напр. @alex)">
             <input type="password" id="reg-pass" placeholder="Придумайте пароль">
             <input type="password" id="reg-pass2" placeholder="Подтвердите пароль">
-            <button class="auth-btn" onclick="registerUser()">Создать</button>
+            <button class="action-btn" onclick="registerUser()">Создать</button>
             <div class="auth-switch" onclick="toggleAuth('login')">Уже есть аккаунт? Войти</div>
         </div>
     </div>
 
-    <!-- УВЕДОМЛЕНИЕ О ЗВОНКЕ -->
+    <!-- ЭКРАН НАСТРОЕК ПРОФИЛЯ -->
+    <div id="settings-screen" class="screen">
+        <header class="glass-panel">
+            <button class="icon-btn" onclick="showScreen('contacts-screen')">◀ Назад</button>
+            <h2>Настройки</h2>
+            <div style="width: 60px;"></div> <!-- Пустое место для центровки -->
+        </header>
+        <div style="padding: 20px; overflow-y: auto;">
+            <div class="form-container glass-panel" style="margin: 0 auto; padding: 30px 20px;">
+                <!-- Предпросмотр Аватарки -->
+                <div id="set-avatar-preview" class="avatar" style="width: 90px; height: 90px; margin: 0 auto 20px; font-size: 2.5rem;">?</div>
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; display:block; text-align:left; padding-left:5px;">Никнейм (Отображаемое имя)</label>
+                <input type="text" id="set-nickname" placeholder="Напр. Александр">
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; display:block; text-align:left; padding-left:5px; margin-top: 10px;">URL Аватарки (Ссылка на фото)</label>
+                <input type="text" id="set-avatar-url" placeholder="https://..." oninput="updateAvatarPreview()">
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem; display:block; text-align:left; padding-left:5px; margin-top: 10px;">Юзернейм (@login)</label>
+                <input type="text" id="set-username" placeholder="@alex">
+                
+                <button class="action-btn" onclick="saveSettings()">Сохранить профиль</button>
+                <p style="color: #ff4b2b; font-size: 0.8rem; margin-top:15px;">Внимание: Смена юзернейма создаст новый профиль.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="incoming-call-alert" class="glass-panel">
         <div style="display: flex; flex-direction: column;">
-            <span style="font-size: 0.8rem; color: var(--primary);">Входящий видеозвонок</span>
+            <span style="font-size: 0.8rem; color: var(--primary);">Входящий вызов</span>
             <span id="caller-name" style="font-size: 1.2rem; font-weight: bold;">@user</span>
         </div>
         <div style="display: flex; gap: 10px;">
@@ -210,31 +183,28 @@
         </div>
     </div>
 
-    <!-- КОНТЕЙНЕР ДЛЯ ЗВОНКА -->
     <div id="daily-container">
         <div id="daily-iframe-wrapper"></div>
         <div class="daily-close-btn" onclick="endCall()">Завершить вызов</div>
     </div>
 
-    <!-- ЭКРАН КОНТАКТОВ -->
     <div id="contacts-screen" class="screen">
         <header class="glass-panel">
-            <h2>Контакты</h2>
-            <span id="my-display-name" style="color: var(--primary); font-weight: bold;"></span>
+            <h2 id="my-display-name" style="color: var(--primary); font-weight: bold;">Мой профиль</h2>
+            <button class="icon-btn" onclick="openSettings()">⚙️ Настройки</button>
         </header>
         <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Добавить друга (напр. @Qvosis)" class="glass-panel">
+            <input type="text" id="search-input" placeholder="Поиск друга (напр. @Qvosis)" class="glass-panel">
             <button onclick="addContact()">+</button>
         </div>
         <div class="contact-list" id="contacts-container"></div>
     </div>
 
-    <!-- ЭКРАН ЧАТА -->
     <div id="chat-screen" class="screen">
         <header class="glass-panel">
-            <div class="back-btn" onclick="showScreen('contacts-screen')">◀ Назад</div>
-            <div id="chat-header-name" style="font-size: 1.2rem; font-weight: bold;">@user</div>
-            <button class="call-btn" onclick="startCall()">Видео</button>
+            <button class="icon-btn" onclick="showScreen('contacts-screen')">◀</button>
+            <div id="chat-header-name" style="font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; gap: 10px;">@user</div>
+            <button class="call-btn" onclick="startCall()">📞 Видео</button>
         </header>
         <div class="chat-area" id="chat-messages"></div>
         <div class="input-area glass-panel">
@@ -245,9 +215,26 @@
 
     <script>
         // ==========================================
+        // ГАРАНТИРОВАННОЕ СКРЫТИЕ ЗАГРУЗОЧНОГО ЭКРАНА
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.style.opacity = "0";
+                    setTimeout(() => { 
+                        splash.style.display = 'none'; 
+                        if(document.querySelector('.screen.active') == null) {
+                            showScreen('auth-screen');
+                        }
+                    }, 500);
+                }
+            }, 1500); // Экран загрузки пропадет через 1.5 секунды при любых обстоятельствах
+        });
+
+        // ==========================================
         // 1. НАСТРОЙКИ FIREBASE И DAILY.CO
         // ==========================================
-        // ВАЖНО: Вставь сюда свои конфигурации!
         const firebaseConfig = {
             apiKey: "ТВОЙ_API_KEY",
             authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
@@ -256,29 +243,23 @@
         };
         const DAILY_ROOM_URL = 'https://qvicky.daily.co/0ICnFTTodV4OMILLnCNm';
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const auth = firebase.auth();
+        let db, auth;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            auth = firebase.auth();
+        } catch (e) {
+            console.error("Firebase не настроен: ", e);
+        }
 
         // ==========================================
-        // 2. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // 2. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И ПРОФИЛЬ
         // ==========================================
-        let myName = "";
+        let myProfile = { username: "", nickname: "", avatarUrl: "" };
         let currentChatUser = "";
         let callFrame = null;
         let activeChatListener = null;
         let contacts = JSON.parse(localStorage.getItem('qvicky_contacts')) || [];
-
-        // Анимация сплеш-экрана при старте
-        window.onload = () => {
-            setTimeout(() => {
-                document.getElementById('splash-screen').style.opacity = "0";
-                setTimeout(() => {
-                    document.getElementById('splash-screen').style.display = 'none';
-                    showScreen('auth-screen');
-                }, 500);
-            }, 1500);
-        };
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -286,78 +267,123 @@
         }
 
         function toggleAuth(mode) {
-            if (mode === 'login') {
-                document.getElementById('register-form').style.display = 'none';
-                document.getElementById('login-form').style.display = 'block';
-            } else {
-                document.getElementById('login-form').style.display = 'none';
-                document.getElementById('register-form').style.display = 'block';
-            }
+            document.getElementById('register-form').style.display = mode === 'register' ? 'block' : 'none';
+            document.getElementById('login-form').style.display = mode === 'login' ? 'block' : 'none';
         }
 
         // ==========================================
         // 3. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ
         // ==========================================
-        
-        // Вспомогательные функции: Превращаем юзернейм в технический Email для Firebase Auth
         function formatUsername(u) {
             let name = u.trim().toLowerCase();
             return name.startsWith('@') ? name : '@' + name;
         }
-        function getTechnicalEmail(username) {
-            return username.replace('@', '') + '@qvicky.app';
-        }
 
         function registerUser() {
+            if(!auth) return alert("Firebase не подключен. Вставьте ключи в код.");
             const u = document.getElementById('reg-username').value;
             const p1 = document.getElementById('reg-pass').value;
             const p2 = document.getElementById('reg-pass2').value;
 
             if(!u || !p1) return alert("Заполните все поля!");
             if(p1 !== p2) return alert("Пароли не совпадают!");
-            if(p1.length < 6) return alert("Пароль должен быть минимум 6 символов!");
+            if(p1.length < 6) return alert("Пароль минимум 6 символов!");
 
-            myName = formatUsername(u);
-            const email = getTechnicalEmail(myName);
+            const formattedUser = formatUsername(u);
+            const email = formattedUser.replace('@', '') + '@qvicky.app';
 
             auth.createUserWithEmailAndPassword(email, p1)
-                .then(() => startSession())
-                .catch(err => {
-                    if (err.code === 'auth/email-already-in-use') alert("Этот юзернейм уже занят!");
-                    else alert("Ошибка регистрации: " + err.message);
-                });
+                .then(() => {
+                    myProfile = { username: formattedUser, nickname: formattedUser, avatarUrl: "" };
+                    db.ref('users/' + formattedUser.replace('@', '')).set(myProfile);
+                    startSession();
+                })
+                .catch(err => alert("Ошибка: " + err.message));
         }
 
         function loginUser() {
+            if(!auth) return alert("Firebase не подключен. Вставьте ключи в код.");
             const u = document.getElementById('log-username').value;
             const p = document.getElementById('log-pass').value;
 
             if(!u || !p) return alert("Введите юзернейм и пароль!");
 
-            myName = formatUsername(u);
-            const email = getTechnicalEmail(myName);
+            const formattedUser = formatUsername(u);
+            const email = formattedUser.replace('@', '') + '@qvicky.app';
 
             auth.signInWithEmailAndPassword(email, p)
-                .then(() => startSession())
+                .then(() => {
+                    myProfile.username = formattedUser;
+                    // Скачиваем профиль с сервера
+                    db.ref('users/' + formattedUser.replace('@', '')).once('value').then(snap => {
+                        if(snap.exists()) myProfile = snap.val();
+                        else myProfile = { username: formattedUser, nickname: formattedUser, avatarUrl: "" };
+                        startSession();
+                    });
+                })
                 .catch(err => alert("Неверный логин или пароль!"));
         }
 
         function startSession() {
-            document.getElementById('my-display-name').innerText = myName;
+            document.getElementById('my-display-name').innerText = myProfile.nickname || myProfile.username;
             renderContacts();
             showScreen('contacts-screen');
             listenForCalls();
         }
 
         // ==========================================
-        // 4. СИСТЕМА КОНТАКТОВ
+        // 4. НАСТРОЙКИ ПРОФИЛЯ
+        // ==========================================
+        function openSettings() {
+            document.getElementById('set-nickname').value = myProfile.nickname || "";
+            document.getElementById('set-avatar-url').value = myProfile.avatarUrl || "";
+            document.getElementById('set-username').value = myProfile.username || "";
+            updateAvatarPreview();
+            showScreen('settings-screen');
+        }
+
+        function updateAvatarPreview() {
+            const url = document.getElementById('set-avatar-url').value.trim();
+            const preview = document.getElementById('set-avatar-preview');
+            if (url) {
+                preview.innerHTML = `<img src="${url}" alt="avatar" onerror="this.style.display='none'">`;
+            } else {
+                const initial = myProfile.username ? myProfile.username.charAt(1).toUpperCase() : "?";
+                preview.innerHTML = initial;
+            }
+        }
+
+        function saveSettings() {
+            const newNick = document.getElementById('set-nickname').value.trim();
+            const newAvatar = document.getElementById('set-avatar-url').value.trim();
+            const newUsernameInput = document.getElementById('set-username').value.trim();
+            
+            if(!newUsernameInput) return alert("Юзернейм не может быть пустым!");
+            
+            const newUsername = formatUsername(newUsernameInput);
+
+            if (newUsername !== myProfile.username) {
+                alert("Юзернейм изменен. В будущем для входа используйте новый юзернейм.");
+            }
+
+            myProfile = { username: newUsername, nickname: newNick, avatarUrl: newAvatar };
+            
+            // Сохраняем в базу данных
+            db.ref('users/' + newUsername.replace('@', '')).set(myProfile);
+            
+            document.getElementById('my-display-name').innerText = myProfile.nickname || myProfile.username;
+            showScreen('contacts-screen');
+        }
+
+        // ==========================================
+        // 5. КОНТАКТЫ (Загрузка Аватарок и Ников)
         // ==========================================
         function addContact() {
             let input = document.getElementById('search-input').value.trim();
             if (!input) return;
             
             let targetUser = formatUsername(input);
-            if (targetUser === myName) return alert("Это ваш аккаунт!");
+            if (targetUser === myProfile.username) return alert("Это вы!");
             if (contacts.includes(targetUser)) return alert("Уже в списке!");
 
             contacts.push(targetUser);
@@ -369,53 +395,71 @@
         function renderContacts() {
             const container = document.getElementById('contacts-container');
             container.innerHTML = '';
+            
             contacts.forEach(user => {
-                const isVerified = user === "@qvosis" ? ' verified' : '';
-                const initial = user.charAt(1).toUpperCase();
+                const safeId = user.replace('@', '');
                 
-                const div = document.createElement('div');
-                div.className = 'contact-item glass-panel';
-                div.onclick = () => openChat(user);
-                div.innerHTML = `
-                    <div class="avatar">${initial}</div>
-                    <div style="flex:1;">
-                        <span style="font-weight:bold; font-size:1.1rem;" class="${isVerified}">${user}</span>
-                    </div>
-                `;
-                container.appendChild(div);
+                // Асинхронно скачиваем данные профиля друга
+                db.ref('users/' + safeId).once('value').then(snap => {
+                    const profile = snap.val() || { username: user, nickname: user, avatarUrl: "" };
+                    const isVerified = user.toLowerCase() === "@qvosis" ? ' verified' : '';
+                    const initial = user.charAt(1).toUpperCase();
+                    
+                    const avatarHTML = profile.avatarUrl 
+                        ? `<img src="${profile.avatarUrl}" alt="avatar">` 
+                        : initial;
+
+                    const div = document.createElement('div');
+                    div.className = 'contact-item glass-panel';
+                    div.onclick = () => openChat(profile);
+                    div.innerHTML = `
+                        <div class="avatar">${avatarHTML}</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:bold; font-size:1.1rem;" class="${isVerified}">${profile.nickname}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${profile.username}</div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
             });
         }
 
         // ==========================================
-        // 5. СИСТЕМА ЧАТА (Firebase)
+        // 6. СИСТЕМА ЧАТА
         // ==========================================
         function getChatRoomId(user1, user2) {
             return [user1.replace('@', ''), user2.replace('@', '')].sort().join('_');
         }
 
-        function openChat(user) {
-            currentChatUser = user;
-            const isVerified = user === "@qvosis" ? ' verified' : '';
-            document.getElementById('chat-header-name').innerHTML = `<span class="${isVerified}">${user}</span>`;
+        function openChat(friendProfile) {
+            currentChatUser = friendProfile.username;
+            const isVerified = friendProfile.username.toLowerCase() === "@qvosis" ? ' verified' : '';
+            
+            // Оформляем шапку чата
+            const avatarHTML = friendProfile.avatarUrl 
+                ? `<div class="avatar" style="width:35px;height:35px;margin:0;"><img src="${friendProfile.avatarUrl}"></div>` 
+                : `<div class="avatar" style="width:35px;height:35px;margin:0;font-size:1rem;">${friendProfile.username.charAt(1).toUpperCase()}</div>`;
+            
+            document.getElementById('chat-header-name').innerHTML = `
+                ${avatarHTML}
+                <span class="${isVerified}">${friendProfile.nickname}</span>
+            `;
             
             const chatArea = document.getElementById('chat-messages');
             chatArea.innerHTML = ''; 
 
-            const roomId = getChatRoomId(myName, currentChatUser);
+            const roomId = getChatRoomId(myProfile.username, currentChatUser);
             if (activeChatListener) db.ref('messages/' + activeChatListener).off();
             activeChatListener = roomId;
 
-            db.ref('messages/' + roomId).on('child_added', (snapshot) => {
-                renderSingleMessage(snapshot.val());
-            });
-
+            db.ref('messages/' + roomId).on('child_added', (snapshot) => renderSingleMessage(snapshot.val()));
             showScreen('chat-screen');
         }
 
         function renderSingleMessage(msg) {
             const chatArea = document.getElementById('chat-messages');
             const div = document.createElement('div');
-            div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
+            div.className = `msg ${msg.sender === myProfile.username ? 'me' : 'other'}`;
             div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
             chatArea.appendChild(div);
             chatArea.scrollTop = chatArea.scrollHeight;
@@ -426,9 +470,9 @@
             const text = input.value.trim();
             if (!text || !currentChatUser) return;
 
-            const roomId = getChatRoomId(myName, currentChatUser);
+            const roomId = getChatRoomId(myProfile.username, currentChatUser);
             db.ref('messages/' + roomId).push({
-                sender: myName,
+                sender: myProfile.username,
                 text: text,
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
             });
@@ -436,22 +480,26 @@
         }
 
         // ==========================================
-        // 6. ЗВОНКИ (Daily.co)
+        // 7. ЗВОНКИ (Daily.co)
         // ==========================================
         function listenForCalls() {
-            const mySafeId = myName.replace('@', '');
+            const mySafeId = myProfile.username.replace('@', '');
             db.ref('calls/' + mySafeId).on('value', (snapshot) => {
                 const data = snapshot.val();
                 const alertBox = document.getElementById('incoming-call-alert');
                 
                 if (data && data.status === 'ringing') {
-                    document.getElementById('caller-name').innerText = data.initiator;
-                    alertBox.style.display = 'flex';
+                    // Ищем ник звонящего
+                    db.ref('users/' + data.initiator.replace('@','')).once('value').then(snap => {
+                        const callerProf = snap.val();
+                        document.getElementById('caller-name').innerText = callerProf ? callerProf.nickname : data.initiator;
+                        alertBox.style.display = 'flex';
+                        // Сохраняем технический ID для ответа
+                        alertBox.dataset.caller = data.initiator; 
+                    });
                 } else {
                     alertBox.style.display = 'none';
-                    if (callFrame && document.getElementById('daily-container').style.display !== 'flex') {
-                        endCall();
-                    }
+                    if (callFrame && document.getElementById('daily-container').style.display !== 'flex') endCall();
                 }
             });
         }
@@ -469,7 +517,7 @@
             callFrame.join({ url: DAILY_ROOM_URL });
 
             const targetSafeId = currentChatUser.replace('@', '');
-            db.ref('calls/' + targetSafeId).set({ initiator: myName, status: 'ringing', time: Date.now() });
+            db.ref('calls/' + targetSafeId).set({ initiator: myProfile.username, status: 'ringing', time: Date.now() });
         }
 
         function answerCall() {
@@ -480,10 +528,12 @@
         }
 
         function rejectCall() {
-            document.getElementById('incoming-call-alert').style.display = 'none';
-            db.ref('calls/' + myName.replace('@', '')).remove();
-            const callerSafeId = document.getElementById('caller-name').innerText.replace('@', '');
-            db.ref('calls/' + callerSafeId).set({ status: 'ended', time: Date.now() });
+            const alertBox = document.getElementById('incoming-call-alert');
+            alertBox.style.display = 'none';
+            db.ref('calls/' + myProfile.username.replace('@', '')).remove();
+            
+            const callerId = alertBox.dataset.caller;
+            if(callerId) db.ref('calls/' + callerId.replace('@', '')).set({ status: 'ended', time: Date.now() });
         }
 
         function endCall() {
@@ -491,7 +541,7 @@
             document.getElementById('daily-container').style.display = 'none';
             
             if (currentChatUser) db.ref('calls/' + currentChatUser.replace('@', '')).remove();
-            db.ref('calls/' + myName.replace('@', '')).remove();
+            db.ref('calls/' + myProfile.username.replace('@', '')).remove();
         }
     </script>
 </body>
