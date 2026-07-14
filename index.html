@@ -5,108 +5,239 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Qvicky Messenger</title>
     
-    <!-- Возвращаем старую базу данных Gun.js -->
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
-    <!-- ZegoCloud для звонков -->
-    <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <!-- Daily.co -->
+    <script src="https://unpkg.com/@daily-co/daily-js"></script>
     
     <style>
+        /* === ПАЛИТРА И ЖИДКОЕ СТЕКЛО === */
         :root {
-            --primary: #512da8;
-            --primary-light: #673ab7;
-            --bg-color: #f0f2f5;
-            --chat-bg: #e5ddd5;
-            --text-dark: #333;
-            --text-light: #fff;
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glass-blur: blur(20px);
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body { background-color: var(--bg-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-        .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 600px; margin: 0 auto; background: white; box-shadow: 0 0 20px rgba(0,0,0,0.1); position: relative; }
-        .screen.active { display: flex; }
-
-        header { background: var(--primary); color: var(--text-light); padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-size: 1.2rem; font-weight: bold; z-index: 10; }
-        .back-btn { cursor: pointer; display: flex; align-items: center; font-size: 1rem; }
-        .call-btn { background: #4caf50; border: none; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
-
-        .search-bar { padding: 15px; background: #f9f9f9; border-bottom: 1px solid #ddd; display: flex; gap: 10px; }
-        .search-bar input { flex: 1; padding: 10px 15px; border-radius: 20px; border: 1px solid #ccc; outline: none; }
-        .search-bar button { background: var(--primary); color: white; border: none; padding: 0 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; -webkit-tap-highlight-color: transparent; }
         
-        .contact-list { flex: 1; overflow-y: auto; }
-        .contact-item { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; align-items: center; cursor: pointer; transition: background 0.2s; }
-        .contact-item:hover { background: #f1f1f1; }
-        .avatar { width: 45px; height: 45px; background: var(--primary-light); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; margin-right: 15px; }
-        .contact-info { flex: 1; }
-        .contact-name { font-weight: bold; color: var(--text-dark); font-size: 1.1rem; }
+        body { 
+            background-color: var(--bg-dark); 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            color: var(--text-main);
+            position: relative;
+        }
 
-        .chat-area { flex: 1; background: var(--chat-bg); overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        .msg { max-width: 80%; padding: 10px 15px; border-radius: 18px; font-size: 0.95rem; line-height: 1.4; position: relative; word-wrap: break-word; }
-        .msg.me { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .msg.other { background: white; color: var(--text-dark); align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .msg-time { font-size: 0.7rem; opacity: 0.7; margin-top: 5px; text-align: right; display: block; }
+        /* === АНИМИРОВАННЫЙ ЖИДКИЙ ФОН === */
+        .liquid-bg { position: absolute; inset: 0; overflow: hidden; z-index: -1; }
+        .blob {
+            position: absolute;
+            filter: blur(60px);
+            opacity: 0.6;
+            animation: moveLiquid 12s infinite alternate ease-in-out;
+        }
+        .blob-1 {
+            width: 350px; height: 350px; background: var(--primary);
+            top: -100px; left: -100px;
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+        }
+        .blob-2 {
+            width: 450px; height: 450px; background: #8b5cf6;
+            bottom: -150px; right: -100px;
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            animation-delay: -4s;
+        }
+        .blob-3 {
+            width: 300px; height: 300px; background: #3b82f6;
+            top: 40%; left: 30%;
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            animation-delay: -8s;
+        }
 
-        .input-area { padding: 10px 15px; background: white; display: flex; gap: 10px; align-items: center; border-top: 1px solid #ddd; }
-        .input-area input { flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid #ccc; outline: none; background: #f9f9f9; }
-        .input-area button { background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
+        @keyframes moveLiquid {
+            0% { transform: translateY(0) scale(1) rotate(0deg); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+            50% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+            100% { transform: translateY(-50px) scale(1.1) rotate(20deg); border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+        }
 
-        .verified::after { content: " ✔"; color: #00bcd4; font-size: 1rem; }
+        /* === УНИВЕРСАЛЬНЫЙ КЛАСС ЖИДКОГО СТЕКЛА === */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
 
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-        .login-box { background: white; padding: 30px; border-radius: 20px; text-align: center; color: var(--text-dark); width: 90%; max-width: 400px; }
-        .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 10px; font-size: 1.1rem; text-align: center; }
-        .login-box button { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
+        /* === ЭКРАНЫ === */
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; max-width: 500px; margin: 0 auto; position: relative; z-index: 10; }
+        .screen.active { display: flex; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        #incoming-call-alert { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 3000; align-items: center; gap: 15px; }
-        #incoming-call-alert button { border: none; padding: 8px 15px; border-radius: 15px; font-weight: bold; cursor: pointer; }
+        /* === АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ === */
+        .auth-container { margin: auto; padding: 40px 30px; border-radius: 30px; text-align: center; width: 90%; max-width: 400px; }
+        .auth-container input {
+            width: 100%; padding: 15px 20px; margin: 10px 0; border-radius: 15px; outline: none;
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; font-size: 1.1rem; transition: 0.3s;
+        }
+        .auth-container input::placeholder { color: rgba(255, 255, 255, 0.5); }
+        .auth-container input:focus { background: rgba(255, 255, 255, 0.15); border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
+        .auth-btn {
+            width: 100%; background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #000; border: none; padding: 15px; margin-top: 15px; border-radius: 15px;
+            font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        .auth-btn:active { transform: scale(0.95); }
+        .auth-switch { color: var(--text-muted); font-size: 0.9rem; margin-top: 20px; cursor: pointer; text-decoration: underline; transition: 0.2s; }
+        .auth-switch:hover { color: var(--primary); }
+
+        /* Скрываем формы по умолчанию */
+        #register-form { display: none; }
+
+        /* === ШАПКА === */
+        header { padding: 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--glass-border); border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; margin-bottom: 10px; }
+        .back-btn { cursor: pointer; color: var(--primary); font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .call-btn { background: rgba(0, 176, 155, 0.2); color: #00f2fe; border: 1px solid #00b09b; padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .call-btn:hover { background: #00b09b; color: white; box-shadow: 0 0 15px rgba(0, 176, 155, 0.5); }
+
+        /* === КОНТАКТЫ === */
+        .search-bar { padding: 10px 20px; display: flex; gap: 10px; }
+        .search-bar input { flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white; outline: none; }
+        .search-bar button { background: var(--primary); color: #000; border: none; padding: 0 20px; border-radius: 25px; font-weight: bold; cursor: pointer; }
+        .contact-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .contact-item { padding: 15px; margin-bottom: 12px; border-radius: 20px; display: flex; align-items: center; cursor: pointer; transition: 0.3s; }
+        .contact-item:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(0, 242, 254, 0.4); }
+        .avatar { width: 45px; height: 45px; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; margin-right: 15px; box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); }
+
+        /* === ЧАТ === */
+        .chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 75%; padding: 12px 18px; border-radius: 20px; font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; }
+        .msg.me { background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border: 1px solid rgba(0, 242, 254, 0.3); color: white; align-self: flex-end; border-bottom-right-radius: 5px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        .msg.other { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: white; align-self: flex-start; border-bottom-left-radius: 5px; }
+        .msg-time { font-size: 0.7rem; opacity: 0.6; display: block; text-align: right; margin-top: 5px; }
+
+        .input-area { padding: 15px 20px; display: flex; gap: 10px; border-top: 1px solid var(--glass-border); border-top-left-radius: 20px; border-top-right-radius: 20px; }
+        .input-area input { flex: 1; padding: 15px 20px; border-radius: 25px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); color: white; outline: none; }
+        .input-area button { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #000; border: none; width: 50px; height: 50px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; }
+
+        /* === ГАЛОЧКА И СПЛЕШ === */
+        .verified::after { content: " ✔"; color: var(--primary); font-size: 1rem; text-shadow: 0 0 8px var(--primary); }
         
-        #zego-wrapper { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; z-index: 1500; }
-        #zego-container { width: 100%; height: 100%; }
+        #splash-screen { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s ease; background: var(--bg-dark); }
+        .logo-svg { width: 120px; height: 120px; animation: pulse 2s infinite ease-in-out; }
+        @keyframes pulse { 0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--primary)); } 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); } }
+
+        /* === ОКНО ЗВОНКА === */
+        #incoming-call-alert { display: none; position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; padding: 20px 30px; border-radius: 25px; align-items: center; gap: 20px; }
+        .btn-answer { background: #00b09b; border: none; padding: 10px 20px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-reject { background: #ff4b2b; border: none; padding: 10px 20px; border-radius: 20px; color: white; font-weight: bold; cursor: pointer; }
+
+        #daily-container { display: none; position: fixed; inset: 0; background: black; z-index: 2000; flex-direction: column; }
+        #daily-iframe-wrapper { flex: 1; width: 100%; }
+        .daily-close-btn { background: #ff4b2b; color: white; padding: 20px; text-align: center; font-weight: bold; cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
-    <div id="login-overlay">
-        <h1 style="margin-bottom: 20px;">Qvicky 📱</h1>
-        <div class="login-box">
-            <h2>Ваш юзернейм</h2>
-            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">Придумайте логин для звонков</p>
-            <input type="text" id="my-username" placeholder="@alex">
-            <button onclick="initApp()">Войти</button>
+    <!-- Жидкий анимированный фон -->
+    <div class="liquid-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- ЭКРАН ЗАГРУЗКИ -->
+    <div id="splash-screen">
+        <svg class="logo-svg" viewBox="0 0 100 100">
+            <defs>
+                <linearGradient id="qGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00f2fe" />
+                    <stop offset="100%" stop-color="#4facfe" />
+                </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#qGrad)" stroke-width="8" />
+            <path d="M 65 65 L 85 85" stroke="url(#qGrad)" stroke-width="10" stroke-linecap="round" />
+            <circle cx="50" cy="50" r="15" fill="url(#qGrad)" />
+        </svg>
+        <div style="margin-top: 20px; font-size: 2rem; font-weight: bold; letter-spacing: 2px; color: white;">QVICKY</div>
+    </div>
+
+    <!-- ЭКРАН АВТОРИЗАЦИИ / РЕГИСТРАЦИИ -->
+    <div id="auth-screen" class="screen">
+        
+        <!-- Форма Входа -->
+        <div class="auth-container glass-panel" id="login-form">
+            <h2>С возвращением!</h2>
+            <p style="color: var(--text-muted); margin: 10px 0 20px;">Введите данные для входа</p>
+            <input type="text" id="log-username" placeholder="Юзернейм (напр. @alex)">
+            <input type="password" id="log-pass" placeholder="Пароль">
+            <button class="auth-btn" onclick="loginUser()">Войти</button>
+            <div class="auth-switch" onclick="toggleAuth('register')">Нет аккаунта? Зарегистрироваться</div>
+        </div>
+
+        <!-- Форма Регистрации -->
+        <div class="auth-container glass-panel" id="register-form">
+            <h2>Создать аккаунт</h2>
+            <p style="color: var(--text-muted); margin: 10px 0 20px;">Придумайте свой уникальный юзернейм</p>
+            <input type="text" id="reg-username" placeholder="Юзернейм (напр. @alex)">
+            <input type="password" id="reg-pass" placeholder="Придумайте пароль">
+            <input type="password" id="reg-pass2" placeholder="Подтвердите пароль">
+            <button class="auth-btn" onclick="registerUser()">Создать</button>
+            <div class="auth-switch" onclick="toggleAuth('login')">Уже есть аккаунт? Войти</div>
         </div>
     </div>
 
-    <div id="incoming-call-alert">
-        <span id="caller-name">Входящий...</span>
-        <button style="background: #4caf50; color: white;" onclick="answerCall()">Ответить</button>
-        <button style="background: #f44336; color: white;" onclick="rejectCall()">Сбросить</button>
+    <!-- УВЕДОМЛЕНИЕ О ЗВОНКЕ -->
+    <div id="incoming-call-alert" class="glass-panel">
+        <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 0.8rem; color: var(--primary);">Входящий видеозвонок</span>
+            <span id="caller-name" style="font-size: 1.2rem; font-weight: bold;">@user</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-answer" onclick="answerCall()">Ответить</button>
+            <button class="btn-reject" onclick="rejectCall()">Сбросить</button>
+        </div>
     </div>
 
-    <div id="zego-wrapper">
-        <div id="zego-container"></div>
+    <!-- КОНТЕЙНЕР ДЛЯ ЗВОНКА -->
+    <div id="daily-container">
+        <div id="daily-iframe-wrapper"></div>
+        <div class="daily-close-btn" onclick="endCall()">Завершить вызов</div>
     </div>
 
+    <!-- ЭКРАН КОНТАКТОВ -->
     <div id="contacts-screen" class="screen">
-        <header>
-            <span>Контакты</span>
-            <span id="my-display-name" style="font-size: 0.9rem; opacity: 0.8;"></span>
+        <header class="glass-panel">
+            <h2>Контакты</h2>
+            <span id="my-display-name" style="color: var(--primary); font-weight: bold;"></span>
         </header>
         <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Найти (напр. @Qvosis)">
-            <button onclick="addContact()">Добавить</button>
+            <input type="text" id="search-input" placeholder="Добавить друга (напр. @Qvosis)" class="glass-panel">
+            <button onclick="addContact()">+</button>
         </div>
         <div class="contact-list" id="contacts-container"></div>
     </div>
 
+    <!-- ЭКРАН ЧАТА -->
     <div id="chat-screen" class="screen">
-        <header>
+        <header class="glass-panel">
             <div class="back-btn" onclick="showScreen('contacts-screen')">◀ Назад</div>
-            <div id="chat-header-name" class="contact-name">@user</div>
-            <button class="call-btn" onclick="startCall()">📞 Видео</button>
+            <div id="chat-header-name" style="font-size: 1.2rem; font-weight: bold;">@user</div>
+            <button class="call-btn" onclick="startCall()">Видео</button>
         </header>
         <div class="chat-area" id="chat-messages"></div>
-        <div class="input-area">
+        <div class="input-area glass-panel">
             <input type="text" id="msg-input" placeholder="Сообщение..." onkeypress="if(event.key === 'Enter') sendMessage()">
             <button onclick="sendMessage()">➤</button>
         </div>
@@ -114,200 +245,123 @@
 
     <script>
         // ==========================================
-        // ВСТАВЬ СВОИ ДАННЫЕ ОТ ZEGOCLOUD СЮДА:
+        // 1. НАСТРОЙКИ FIREBASE И DAILY.CO
         // ==========================================
-        const ZEGOCLOUD_APP_ID = 1787230976; // ВАЖНО: Должна быть цифра (без кавычек)
-        const ZEGOCLOUD_SERVER_SECRET = "13781fdd5faecce543c56060642fb0b2"; // ВАЖНО: Должна быть строка в кавычках
+        // ВАЖНО: Вставь сюда свои конфигурации!
+        const firebaseConfig = {
+            apiKey: "ТВОЙ_API_KEY",
+            authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
+            databaseURL: "ТВОЙ_DATABASE_URL",
+            projectId: "ТВОЙ_ПРОЕКТ"
+        };
+        const DAILY_ROOM_URL = 'https://qvicky.daily.co/0ICnFTTodV4OMILLnCNm';
 
-        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        // ==========================================
+        // 2. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        // ==========================================
         let myName = "";
         let currentChatUser = "";
-        let zegoInstance = null; 
-        let incomingRoomID = ""; 
-        let incomingCallerName = ""; 
-        
-        // Подключаем Gun.js сразу с несколькими серверами для надежности
-        const gun = Gun([
-            'https://gun-manhattan.herokuapp.com/gun',
-            'https://peer.wallie.io/gun',
-            'https://gun-vue.js.org/gun'
-        ]);
+        let callFrame = null;
+        let activeChatListener = null;
+        let contacts = JSON.parse(localStorage.getItem('qvicky_contacts')) || [];
 
-        let localDB = {
-            contacts: JSON.parse(localStorage.getItem('qvicky_contacts')) || [],
-            messages: JSON.parse(localStorage.getItem('qvicky_messages')) || {}
+        // Анимация сплеш-экрана при старте
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = "0";
+                setTimeout(() => {
+                    document.getElementById('splash-screen').style.display = 'none';
+                    showScreen('auth-screen');
+                }, 500);
+            }, 1500);
         };
 
-        function initApp() {
-            let input = document.getElementById('my-username').value.trim();
-            if (!input) return alert("Введите юзернейм!");
-            
-            // Чтобы не было путаницы, переводим все юзернеймы в нижний регистр
-            myName = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
-            
-            document.getElementById('login-overlay').style.display = 'none';
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function toggleAuth(mode) {
+            if (mode === 'login') {
+                document.getElementById('register-form').style.display = 'none';
+                document.getElementById('login-form').style.display = 'block';
+            } else {
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('register-form').style.display = 'block';
+            }
+        }
+
+        // ==========================================
+        // 3. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ
+        // ==========================================
+        
+        // Вспомогательные функции: Превращаем юзернейм в технический Email для Firebase Auth
+        function formatUsername(u) {
+            let name = u.trim().toLowerCase();
+            return name.startsWith('@') ? name : '@' + name;
+        }
+        function getTechnicalEmail(username) {
+            return username.replace('@', '') + '@qvicky.app';
+        }
+
+        function registerUser() {
+            const u = document.getElementById('reg-username').value;
+            const p1 = document.getElementById('reg-pass').value;
+            const p2 = document.getElementById('reg-pass2').value;
+
+            if(!u || !p1) return alert("Заполните все поля!");
+            if(p1 !== p2) return alert("Пароли не совпадают!");
+            if(p1.length < 6) return alert("Пароль должен быть минимум 6 символов!");
+
+            myName = formatUsername(u);
+            const email = getTechnicalEmail(myName);
+
+            auth.createUserWithEmailAndPassword(email, p1)
+                .then(() => startSession())
+                .catch(err => {
+                    if (err.code === 'auth/email-already-in-use') alert("Этот юзернейм уже занят!");
+                    else alert("Ошибка регистрации: " + err.message);
+                });
+        }
+
+        function loginUser() {
+            const u = document.getElementById('log-username').value;
+            const p = document.getElementById('log-pass').value;
+
+            if(!u || !p) return alert("Введите юзернейм и пароль!");
+
+            myName = formatUsername(u);
+            const email = getTechnicalEmail(myName);
+
+            auth.signInWithEmailAndPassword(email, p)
+                .then(() => startSession())
+                .catch(err => alert("Неверный логин или пароль!"));
+        }
+
+        function startSession() {
             document.getElementById('my-display-name').innerText = myName;
-            
             renderContacts();
             showScreen('contacts-screen');
-            listenForNetworkEvents();
+            listenForCalls();
         }
 
         // ==========================================
-        // БАЗА ДАННЫХ И СЕТЬ (Gun.js)
+        // 4. СИСТЕМА КОНТАКТОВ
         // ==========================================
-        function listenForNetworkEvents() {
-            let lastMsgId = {};
-            let lastCallTime = 0;
-
-            const safeMyName = myName.replace('@', '');
-
-            // 1. Слушаем текстовые сообщения
-            gun.get('qvicky_inbox_' + safeMyName).on((data) => {
-                if (!data || !data.text || lastMsgId[data.sender] === data.id) return;
-                lastMsgId[data.sender] = data.id;
-                
-                saveMessageLocally(data.sender, data.sender, data.text);
-                if (currentChatUser === data.sender) renderChat(currentChatUser);
-            });
-
-            // 2. Слушаем звонки
-            gun.get('qvicky_call_' + safeMyName).on((data) => {
-                if (!data || data.time === lastCallTime) return;
-                lastCallTime = data.time;
-
-                const alertBox = document.getElementById('incoming-call-alert');
-                
-                if (data.status === 'ringing') {
-                    incomingRoomID = data.roomID;
-                    incomingCallerName = data.initiator;
-                    document.getElementById('caller-name').innerText = `Звонок от ${data.initiator}`;
-                    alertBox.style.display = 'flex';
-                } 
-                else if (data.status === 'ended') {
-                    alertBox.style.display = 'none';
-                    if (zegoInstance) closeZegoUI();
-                }
-            });
-        }
-
-        // ==========================================
-        // ZEGOCLOUD (УМНАЯ ЛОГИКА ЗВОНКОВ)
-        // ==========================================
-        function startZegoCall(roomID) {
-            try {
-                // Проверка на частую ошибку с ключами
-                if (ZEGOCLOUD_APP_ID === 0 || ZEGOCLOUD_SERVER_SECRET === "ТВОЙ_СЕКРЕТ") {
-                    alert("ОШИБКА: Ты не вставил ключи ZegoCloud в код!");
-                    return false;
-                }
-                
-                // Проверка на протокол (камера не включится без HTTPS или Localhost)
-                if (window.location.protocol === 'file:') {
-                    alert("ОШИБКА: Камера не работает при открытии файла напрямую. Загрузи сайт на Glitch.com или используй локальный сервер (Live Server).");
-                    return false;
-                }
-
-                const wrapper = document.getElementById('zego-wrapper');
-                wrapper.style.display = 'block';
-
-                const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-                    ZEGOCLOUD_APP_ID, 
-                    ZEGOCLOUD_SERVER_SECRET, 
-                    roomID, 
-                    myName, 
-                    myName 
-                );
-
-                zegoInstance = ZegoUIKitPrebuilt.create(kitToken);
-                zegoInstance.joinRoom({
-                    container: document.getElementById('zego-container'),
-                    scenario: { mode: ZegoUIKitPrebuilt.OneONoneCall },
-                    showPreJoinView: false,
-                    
-                    onLeaveRoom: () => {
-                        closeZegoUI();
-                        const targetUser = currentChatUser || incomingCallerName;
-                        if (targetUser) {
-                            const targetSafeId = targetUser.replace('@', '');
-                            gun.get('qvicky_call_' + targetSafeId).put({ status: 'ended', time: Date.now() });
-                        }
-                    }
-                });
-                return true;
-            } catch (error) {
-                alert("Критическая ошибка при запуске камеры. Убедись, что AppID написан без кавычек. Текст ошибки: " + error.message);
-                closeZegoUI();
-                return false;
-            }
-        }
-
-        function closeZegoUI() {
-            document.getElementById('zego-wrapper').style.display = 'none';
-            if (zegoInstance) {
-                zegoInstance.destroy();
-                zegoInstance = null;
-            }
-        }
-
-        // Я нажимаю кнопку "Позвонить"
-        function startCall() {
-            if (!currentChatUser) return;
-            
-            const roomID = 'room_' + myName.replace('@', '');
-            
-            // Пытаемся запустить звонок у себя
-            const isCallStarted = startZegoCall(roomID);
-
-            // Если камера успешно включилась, шлем сигнал другу
-            if (isCallStarted) {
-                const targetSafeId = currentChatUser.replace('@', '');
-                gun.get('qvicky_call_' + targetSafeId).put({
-                    initiator: myName,
-                    roomID: roomID,
-                    status: 'ringing',
-                    time: Date.now()
-                });
-            }
-        }
-
-        // Я отвечаю на вызов
-        function answerCall() {
-            document.getElementById('incoming-call-alert').style.display = 'none';
-            currentChatUser = incomingCallerName; 
-            startZegoCall(incomingRoomID); 
-        }
-
-        // Я сбрасываю вызов
-        function rejectCall() {
-            document.getElementById('incoming-call-alert').style.display = 'none';
-            const targetSafeId = incomingCallerName.replace('@', '');
-            gun.get('qvicky_call_' + targetSafeId).put({ status: 'ended', time: Date.now() });
-        }
-
-        // ==========================================
-        // ЛОГИКА ЧАТА И КОНТАКТОВ
-        // ==========================================
-        function saveMessageLocally(chatWith, sender, text) {
-            if (!localDB.messages[chatWith]) localDB.messages[chatWith] = [];
-            localDB.messages[chatWith].push({
-                sender: sender, text: text,
-                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            });
-            localStorage.setItem('qvicky_messages', JSON.stringify(localDB.messages));
-        }
-
         function addContact() {
             let input = document.getElementById('search-input').value.trim();
             if (!input) return;
             
-            let targetUser = input.startsWith('@') ? input.toLowerCase() : '@' + input.toLowerCase();
-            
-            if (targetUser === myName) return alert("Это ваш юзернейм!");
-            if (localDB.contacts.includes(targetUser)) return alert("Уже в контактах!");
+            let targetUser = formatUsername(input);
+            if (targetUser === myName) return alert("Это ваш аккаунт!");
+            if (contacts.includes(targetUser)) return alert("Уже в списке!");
 
-            localDB.contacts.push(targetUser);
-            localStorage.setItem('qvicky_contacts', JSON.stringify(localDB.contacts));
+            contacts.push(targetUser);
+            localStorage.setItem('qvicky_contacts', JSON.stringify(contacts));
             document.getElementById('search-input').value = '';
             renderContacts();
         }
@@ -315,40 +369,55 @@
         function renderContacts() {
             const container = document.getElementById('contacts-container');
             container.innerHTML = '';
-            localDB.contacts.forEach(user => {
+            contacts.forEach(user => {
                 const isVerified = user === "@qvosis" ? ' verified' : '';
                 const initial = user.charAt(1).toUpperCase();
+                
                 const div = document.createElement('div');
-                div.className = 'contact-item';
+                div.className = 'contact-item glass-panel';
                 div.onclick = () => openChat(user);
-                div.innerHTML = `<div class="avatar">${initial}</div><div class="contact-info"><div class="contact-name${isVerified}">${user}</div></div>`;
+                div.innerHTML = `
+                    <div class="avatar">${initial}</div>
+                    <div style="flex:1;">
+                        <span style="font-weight:bold; font-size:1.1rem;" class="${isVerified}">${user}</span>
+                    </div>
+                `;
                 container.appendChild(div);
             });
         }
 
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
+        // ==========================================
+        // 5. СИСТЕМА ЧАТА (Firebase)
+        // ==========================================
+        function getChatRoomId(user1, user2) {
+            return [user1.replace('@', ''), user2.replace('@', '')].sort().join('_');
         }
 
         function openChat(user) {
             currentChatUser = user;
             const isVerified = user === "@qvosis" ? ' verified' : '';
             document.getElementById('chat-header-name').innerHTML = `<span class="${isVerified}">${user}</span>`;
-            renderChat(user);
+            
+            const chatArea = document.getElementById('chat-messages');
+            chatArea.innerHTML = ''; 
+
+            const roomId = getChatRoomId(myName, currentChatUser);
+            if (activeChatListener) db.ref('messages/' + activeChatListener).off();
+            activeChatListener = roomId;
+
+            db.ref('messages/' + roomId).on('child_added', (snapshot) => {
+                renderSingleMessage(snapshot.val());
+            });
+
             showScreen('chat-screen');
         }
 
-        function renderChat(user) {
+        function renderSingleMessage(msg) {
             const chatArea = document.getElementById('chat-messages');
-            chatArea.innerHTML = '';
-            const history = localDB.messages[user] || [];
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
-                div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
-                chatArea.appendChild(div);
-            });
+            const div = document.createElement('div');
+            div.className = `msg ${msg.sender === myName ? 'me' : 'other'}`;
+            div.innerHTML = `${msg.text} <span class="msg-time">${msg.time}</span>`;
+            chatArea.appendChild(div);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
 
@@ -357,16 +426,72 @@
             const text = input.value.trim();
             if (!text || !currentChatUser) return;
 
-            saveMessageLocally(currentChatUser, myName, text);
-            renderChat(currentChatUser);
-            input.value = '';
-
-            const targetSafeId = currentChatUser.replace('@', '');
-            gun.get('qvicky_inbox_' + targetSafeId).put({
+            const roomId = getChatRoomId(myName, currentChatUser);
+            db.ref('messages/' + roomId).push({
                 sender: myName,
                 text: text,
-                id: Date.now()
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
             });
+            input.value = '';
+        }
+
+        // ==========================================
+        // 6. ЗВОНКИ (Daily.co)
+        // ==========================================
+        function listenForCalls() {
+            const mySafeId = myName.replace('@', '');
+            db.ref('calls/' + mySafeId).on('value', (snapshot) => {
+                const data = snapshot.val();
+                const alertBox = document.getElementById('incoming-call-alert');
+                
+                if (data && data.status === 'ringing') {
+                    document.getElementById('caller-name').innerText = data.initiator;
+                    alertBox.style.display = 'flex';
+                } else {
+                    alertBox.style.display = 'none';
+                    if (callFrame && document.getElementById('daily-container').style.display !== 'flex') {
+                        endCall();
+                    }
+                }
+            });
+        }
+
+        function initDailyFrame() {
+            if (callFrame) return;
+            const wrapper = document.getElementById('daily-iframe-wrapper');
+            callFrame = window.DailyIframe.createFrame(wrapper, { iframeStyle: { width: '100%', height: '100%', border: 'none' } });
+        }
+
+        function startCall() {
+            if (!currentChatUser) return;
+            document.getElementById('daily-container').style.display = 'flex';
+            initDailyFrame();
+            callFrame.join({ url: DAILY_ROOM_URL });
+
+            const targetSafeId = currentChatUser.replace('@', '');
+            db.ref('calls/' + targetSafeId).set({ initiator: myName, status: 'ringing', time: Date.now() });
+        }
+
+        function answerCall() {
+            document.getElementById('incoming-call-alert').style.display = 'none';
+            document.getElementById('daily-container').style.display = 'flex';
+            initDailyFrame();
+            callFrame.join({ url: DAILY_ROOM_URL });
+        }
+
+        function rejectCall() {
+            document.getElementById('incoming-call-alert').style.display = 'none';
+            db.ref('calls/' + myName.replace('@', '')).remove();
+            const callerSafeId = document.getElementById('caller-name').innerText.replace('@', '');
+            db.ref('calls/' + callerSafeId).set({ status: 'ended', time: Date.now() });
+        }
+
+        function endCall() {
+            if (callFrame) { callFrame.destroy(); callFrame = null; }
+            document.getElementById('daily-container').style.display = 'none';
+            
+            if (currentChatUser) db.ref('calls/' + currentChatUser.replace('@', '')).remove();
+            db.ref('calls/' + myName.replace('@', '')).remove();
         }
     </script>
 </body>
